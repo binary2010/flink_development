@@ -21,8 +21,8 @@ public class KafkaConsumer {
         consumeProp.put("group.id", "flink-development");
         //设置false 则不更新offset
         consumeProp.put("enable.auto.commit", "false");
-        //consumeProp.put("auto.offset.reset", "earliest");
-        consumeProp.put("auto.offset.reset", "latest");
+        consumeProp.put("auto.offset.reset", "earliest");
+        //consumeProp.put("auto.offset.reset", "latest");
         consumeProp.put("auto.commit.interval.ms", "1000");
         //consumeProp.put("key.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
         //consumeProp.put("value.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
