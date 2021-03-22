@@ -5,7 +5,7 @@ import redis.clients.jedis.BinaryClient;
 import redis.clients.jedis.Jedis;
 import redis.clients.jedis.JedisPool;
 import redis.clients.jedis.SortingParams;
-import redis.clients.util.SafeEncoder;
+import redis.clients.jedis.util.SafeEncoder;
 
 import java.io.Serializable;
 import java.util.List;
@@ -43,13 +43,13 @@ public class JedisUtil implements Serializable {
 
     public void returnJedis(Jedis jedis) {
         if (null != jedis && null != jedisPool) {
-            jedisPool.returnResource(jedis);
+            //jedisPool.getResource();
         }
     }
 
     public void returnBrokenResource(Jedis jedis) {
         if (null != jedis && null != jedisPool) {
-            jedisPool.returnResource(jedis);
+            //jedisPool.close();
         }
     }
 
@@ -1044,37 +1044,8 @@ public class JedisUtil implements Serializable {
         return lset(SafeEncoder.encode(key), index, SafeEncoder.encode(value));
     }
 
-    /**
-     * 在value的相对位置插入记录
-     *
-     * @param key
-     * @param where 前面插入或后面插入
-     * @param pivot 相对位置的内容
-     * @param value 插入的内容
-     * @return 记录总数
-     */
-    public long linsert(String key, BinaryClient.LIST_POSITION where, String pivot,
-                        String value) {
-        return linsert(SafeEncoder.encode(key), where,
-                SafeEncoder.encode(pivot), SafeEncoder.encode(value));
-    }
 
-    /**
-     * 在指定位置插入记录
-     *
-     * @param key
-     * @param where 前面插入或后面插入
-     * @param pivot 相对位置的内容
-     * @param value 插入的内容
-     * @return 记录总数
-     */
-    public long linsert(byte[] key, BinaryClient.LIST_POSITION where, byte[] pivot,
-                        byte[] value) {
-        Jedis jedis = getJedis();
-        long count = jedis.linsert(key, where, pivot, value);
-        returnJedis(jedis);
-        return count;
-    }
+
 
     /**
      * 获取List中指定位置的值

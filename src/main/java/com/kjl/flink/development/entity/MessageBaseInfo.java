@@ -14,5 +14,5 @@ public class MessageBaseInfo {
     private String msgid;
     private String msgtype;
     private Date datecreated;
-    private String rawdata;
+    private String msg;
 }

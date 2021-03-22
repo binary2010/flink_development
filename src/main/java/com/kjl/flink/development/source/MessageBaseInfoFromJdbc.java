@@ -1,8 +1,8 @@
 package com.kjl.flink.development.source;
 
 import com.google.common.collect.Queues;
-import com.kjl.flink.streaming.entity.MessageBaseInfo;
-import com.kjl.flink.streaming.util.MySQLUtil;
+import com.kjl.flink.development.entity.MessageBaseInfo;
+import com.kjl.flink.development.util.MySQLUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.concurrent.BasicThreadFactory;
 import org.apache.commons.lang3.time.DateFormatUtils;
@@ -17,7 +17,8 @@ import java.sql.ResultSet;
 import java.util.Date;
 import java.util.concurrent.*;
 
-import static com.kjl.flink.streaming.util.MySQLUtil.converClobToString;
+import static com.kjl.flink.development.util.MySQLUtil.converClobToString;
+
 
 @Slf4j
 public class MessageBaseInfoFromJdbc extends RichParallelSourceFunction<MessageBaseInfo> implements Serializable {

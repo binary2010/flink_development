@@ -1,7 +1,7 @@
 package com.kjl.flink.development.source;
 
-import com.kjl.flink.streaming.entity.MessageBaseInfo;
-import com.kjl.flink.streaming.util.RedisUtil;
+import com.kjl.flink.development.entity.MessageBaseInfo;
+import com.kjl.flink.development.util.RedisUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.time.StopWatch;
 import org.apache.flink.streaming.api.checkpoint.CheckpointedFunction;
@@ -89,7 +89,7 @@ public class MessageBaseInfoFromRedis extends RichSourceFunction<MessageBaseInfo
                 Set<String> listValue = jedis.smembers(listKey);
             }
             count += result.size();
-            cur = scanResult.getStringCursor();
+            cur = scanResult.getCursor();
             if ("0".equals(cur)) {
                 cycleIsFinished = true;
             }

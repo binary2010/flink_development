@@ -18,10 +18,11 @@ public class KafkaConsumer {
     public static FlinkKafkaConsumer<MessageBaseInfo> buildConsumer(String topic, String url) {
         Properties consumeProp = new Properties();
         consumeProp.put("bootstrap.servers", url);
-        consumeProp.put("group.id", "flink-consumer");
+        consumeProp.put("group.id", "flink-development");
         //设置false 则不更新offset
         consumeProp.put("enable.auto.commit", "false");
-        consumeProp.put("auto.offset.reset", "earliest");
+        //consumeProp.put("auto.offset.reset", "earliest");
+        consumeProp.put("auto.offset.reset", "latest");
         consumeProp.put("auto.commit.interval.ms", "1000");
         //consumeProp.put("key.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
         //consumeProp.put("value.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
@@ -45,8 +46,8 @@ public class KafkaConsumer {
                 return TypeExtractor.createTypeInfo(MessageBaseInfo.class);
             }
         }, consumeProp);
-        myConsumer.setStartFromEarliest();     // start from the earliest record possible
-        //myConsumer.setStartFromLatest();       // start from the latest record
+        //myConsumer.setStartFromEarliest();     // start from the earliest record possible
+        myConsumer.setStartFromLatest();       // start from the latest record
         //myConsumer.setStartFromTimestamp(...); // start from specified epoch timestamp (milliseconds)
         //myConsumer.setStartFromGroupOffsets(); // the default behaviour
 

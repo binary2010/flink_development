@@ -28,7 +28,7 @@ public class MessageDecodeUtil {
 
     static {
         HapiContext context = new DefaultHapiContext();
-        ModelClassFactory cmf = new CustomModelClassFactory("org.hkuszh.kjl.parking.message.custommodel");
+        ModelClassFactory cmf = new CustomModelClassFactory("com.kjl.flink.development.custommodel");
 
         context.setModelClassFactory(cmf);
         NoValidation noValidation = new NoValidation();
@@ -41,7 +41,7 @@ public class MessageDecodeUtil {
         List<MessageInfo> messageInfoList = Lists.newArrayList();
         Message msg = null;
         HapiContext context = new DefaultHapiContext();
-        ModelClassFactory cmf = new CustomModelClassFactory("org.hkuszh.kjl.parking.message.custommodel");
+        ModelClassFactory cmf = new CustomModelClassFactory("com.kjl.flink.development.custommodel");
 
         context.setModelClassFactory(cmf);
         NoValidation noValidation = new NoValidation();
@@ -302,7 +302,7 @@ public class MessageDecodeUtil {
 
         try {
             //for(String messageStr:messageInfo.getRawData().split("MSH")) {
-            msg = parser.parse(messageInfo.getRawdata());
+            msg = parser.parse(messageInfo.getMsg());
             if (msg != null) {
                 MSH msh = (MSH) msg.get("MSH");
                 if ("A08".equals(msh.getMsh9_MessageType().getMsg2_TriggerEvent().getValue()) ||
@@ -545,7 +545,7 @@ public class MessageDecodeUtil {
             //}
         } catch (Exception e) {
             log.error("消息解析出错", e);
-            log.info("消息内容:{}", messageInfo.getRawdata());
+            log.info("消息内容:{}", messageInfo.getMsg());
         }
         return messageInfoList;
     }

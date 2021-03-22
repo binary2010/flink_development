@@ -36,19 +36,22 @@ import static com.kjl.flink.development.util.MessageDecodeUtil.transforMessage;
 public class ProcessMessageFromKafka implements Serializable {
     static JedisUtil resultJedis = new JedisUtil();
     static JedisUtil cacheJedis = new JedisUtil();
-    static JedisPool resultPool = new JedisPool(new JedisPoolConfig(), "10.2.84.21", 6379, 1000, null, 1);
-    static JedisPool cachePool = new JedisPool(new JedisPoolConfig(), "10.2.84.21", 6379, 1000, null, 2);
+    static JedisPool resultPool = new JedisPool(new JedisPoolConfig(),
+            "10.2.200.5", 16379, 1000, "20211223fdfsdfsdfdf@$%ssfpoooiSEEWWEE", 1);
+    static JedisPool cachePool = new JedisPool(new JedisPoolConfig(),
+            "10.2.200.5", 16379, 1000, "20211223fdfsdfsdfdf@$%ssfpoooiSEEWWEE", 2);
 
     @SuppressWarnings("unchecked")
     public static void main(String[] args) throws Exception {
+        log.info("begin");
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime);
         env.setParallelism(1);
         PojoTypeInfo<MessageBaseInfo> pojoType = (PojoTypeInfo<MessageBaseInfo>) TypeExtractor.createTypeInfo(MessageBaseInfo.class);
 
-        String host = "10.2.84.21";
-        int port = 6379;
-        String password = "";
+        String host = "10.2.200.5";
+        int port = 16379;
+        String password = "20211223fdfsdfsdfdf@$%ssfpoooiSEEWWEE";
 
 //        JedisUtil resultJedis = new JedisUtil(host, port, 1000, null, 1);
 //        resultJedis.flushAll();
@@ -59,22 +62,24 @@ public class ProcessMessageFromKafka implements Serializable {
         //JedisPool resultPool = new JedisPool(new JedisPoolConfig(), host, port, 1000, null, 1);
         resultJedis.setJedisPool(resultPool);
         resultJedis.flushAll();
+        resultJedis.set("abc","123");
 
         //JedisUtil cacheJedis = new JedisUtil();
         //JedisPool cachePool = new JedisPool(new JedisPoolConfig(), host, port, 1000, null, 2);
         cacheJedis.setJedisPool(cachePool);
         cacheJedis.flushAll();
+        cacheJedis.set("efg","456");
 
 
         FlinkJedisPoolConfig conf = new FlinkJedisPoolConfig.Builder()
                 .setHost(host)
                 .setPort(port)
-                //.setPassword(null)
-                .setDatabase(3)
+                .setPassword(password)
+                .setDatabase(0)
                 .build();
         RedisSink redisSink = new RedisSink<Tuple2<String, String>>(conf, new RedisSinkMapper());
-        FlinkKafkaConsumer<MessageBaseInfo> myConsumer = KafkaConsumer.buildConsumer("140_his_hl7",
-                "10.2.84.21:9092");
+        FlinkKafkaConsumer<MessageBaseInfo> myConsumer = KafkaConsumer.buildConsumer("his_hl7",
+                "10.2.200.69:9092,10.2.200.69:9093,10.2.200.69:9094");
 
         env
                 .addSource(myConsumer)
