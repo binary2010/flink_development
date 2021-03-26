@@ -109,7 +109,7 @@ public class ProcessMessageFromKafka implements Serializable {
                         return info.getDateCreated().getTime();
                     }
                 }).setParallelism(1)
-                .timeWindowAll(Time.hours(10))
+                .timeWindowAll(Time.hours(1))
                 .apply(new AllWindowFunction<MessageProcessInfo, Tuple2<String, String>, TimeWindow>() {
                     @Override
                     public void apply(TimeWindow window, Iterable<MessageProcessInfo> input, Collector<Tuple2<String, String>> out) throws Exception {
