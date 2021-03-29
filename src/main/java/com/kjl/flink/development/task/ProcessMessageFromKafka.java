@@ -8,6 +8,7 @@ import com.kjl.flink.development.util.JedisUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.time.DateFormatUtils;
 import org.apache.flink.api.common.JobExecutionResult;
+import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.api.common.functions.FlatMapFunction;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.api.java.typeutils.PojoTypeInfo;
@@ -15,18 +16,21 @@ import org.apache.flink.api.java.typeutils.TypeExtractor;
 import org.apache.flink.streaming.api.TimeCharacteristic;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.timestamps.AscendingTimestampExtractor;
+import org.apache.flink.streaming.api.functions.timestamps.BoundedOutOfOrdernessTimestampExtractor;
 import org.apache.flink.streaming.api.functions.windowing.AllWindowFunction;
 import org.apache.flink.streaming.api.windowing.time.Time;
 import org.apache.flink.streaming.api.windowing.windows.TimeWindow;
 import org.apache.flink.streaming.connectors.kafka.FlinkKafkaConsumer;
 import org.apache.flink.streaming.connectors.redis.RedisSink;
 import org.apache.flink.streaming.connectors.redis.common.config.FlinkJedisPoolConfig;
+import org.apache.flink.streaming.runtime.operators.util.AssignerWithPeriodicWatermarksAdapter;
 import org.apache.flink.util.Collector;
 import redis.clients.jedis.JedisPool;
 import redis.clients.jedis.JedisPoolConfig;
 
 import java.io.Serializable;
 import java.sql.Timestamp;
+import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
@@ -37,21 +41,21 @@ public class ProcessMessageFromKafka implements Serializable {
     static JedisUtil resultJedis = new JedisUtil();
     static JedisUtil cacheJedis = new JedisUtil();
     static JedisPool resultPool = new JedisPool(new JedisPoolConfig(),
-            "10.2.200.5", 16379, 1000, "20211223fdfsdfsdfdf@$%ssfpoooiSEEWWEE", 1);
+            "10.2.200.69", 6379, 1000, "2021oeoeiekkfsfiijwejskdjfksdfkdf", 1);
     static JedisPool cachePool = new JedisPool(new JedisPoolConfig(),
-            "10.2.200.5", 16379, 1000, "20211223fdfsdfsdfdf@$%ssfpoooiSEEWWEE", 2);
+            "10.2.200.69", 6379, 1000, "2021oeoeiekkfsfiijwejskdjfksdfkdf", 2);
 
     @SuppressWarnings("unchecked")
     public static void main(String[] args) throws Exception {
         log.info("begin");
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
-        env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime);
+        //env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime);
         env.setParallelism(1);
         PojoTypeInfo<MessageBaseInfo> pojoType = (PojoTypeInfo<MessageBaseInfo>) TypeExtractor.createTypeInfo(MessageBaseInfo.class);
 
-        String host = "10.2.200.5";
-        int port = 16379;
-        String password = "20211223fdfsdfsdfdf@$%ssfpoooiSEEWWEE";
+        String host = "10.2.200.69";
+        int port = 6379;
+        String password = "2021oeoeiekkfsfiijwejskdjfksdfkdf";
 
 //        JedisUtil resultJedis = new JedisUtil(host, port, 1000, null, 1);
 //        resultJedis.flushAll();
@@ -101,6 +105,10 @@ public class ProcessMessageFromKafka implements Serializable {
                     }
                 }).setParallelism(1)
                 // 抽取出时间和生成 watermark 消息创建时间
+//                .assignTimestampsAndWatermarks(WatermarkStrategy
+//                        .<MessageProcessInfo>forBoundedOutOfOrderness(Duration.ofSeconds(20))
+//                        .withTimestampAssigner((event, timestamp) -> event.getDateCreated().getTime())
+//                )
                 .assignTimestampsAndWatermarks(new AscendingTimestampExtractor<MessageProcessInfo>() {
                     @Override
                     public long extractAscendingTimestamp(MessageProcessInfo info) {
@@ -108,8 +116,9 @@ public class ProcessMessageFromKafka implements Serializable {
 //                                DateFormatUtils.format(info.getDateCreated(),"yyyy-MM-dd HH:mm:ss"));
                         return info.getDateCreated().getTime();
                     }
-                }).setParallelism(1)
-                .timeWindowAll(Time.hours(1))
+                })
+                .setParallelism(1)
+                .timeWindowAll(Time.hours(10))
                 .apply(new AllWindowFunction<MessageProcessInfo, Tuple2<String, String>, TimeWindow>() {
                     @Override
                     public void apply(TimeWindow window, Iterable<MessageProcessInfo> input, Collector<Tuple2<String, String>> out) throws Exception {
