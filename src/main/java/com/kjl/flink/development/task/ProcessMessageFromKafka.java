@@ -79,21 +79,30 @@ public class ProcessMessageFromKafka implements Serializable {
                 .flatMap(new FlatMapFunction<MessageBaseInfo, MessageProcessInfo>() {
                     @Override
                     public void flatMap(MessageBaseInfo messageInfo, Collector<MessageProcessInfo> out) throws Exception {
-                        log.info("flink处理消息,id:{},type:{},时间:{}", messageInfo.getMsgid(), messageInfo.getMsgtype(),
-                                DateFormatUtils.format(messageInfo.getDatecreated(), "yyyy-MM-dd HH:mm:ss"));
-                        List<MessageProcessInfo> list = transforMessage(messageInfo);
-                        for (MessageProcessInfo info : list) {
+                        if(messageInfo.getMsgid()!=null) {
+                            //重复过滤
+                            if (cacheJedis.exists("message:"+messageInfo.getMsgid())) {
+                                return;
+                            }
+                            //缓存3600秒
+                            cacheJedis.setEx("message:"+messageInfo.getMsgid(), 3600, "");
+
+                            log.info("flink处理消息,id:{},type:{},时间:{}", messageInfo.getMsgid(), messageInfo.getMsgtype(),
+                                    DateFormatUtils.format(messageInfo.getDatecreated(), "yyyy-MM-dd HH:mm:ss"));
+                            List<MessageProcessInfo> list = transforMessage(messageInfo);
+                            for (MessageProcessInfo info : list) {
 //                            log.info("缓存消息,id:{},type:{},时间:{}",info.getMessageId(),info.getMessageType(),
 //                                    DateFormatUtils.format(info.getDateCreated(),"yyyy-MM-dd HH:mm:ss"));
-                            //分组缓存
-                            //病人号：流水号：申请单号：状态
-                            resultJedis.rpush(info.getMessageType()
-                                            + ":" + "messageZSetCache"
-                                            + ":" + info.getUpid()
-                                            + ":" + info.getClinicNo()
-                                            + ":" + info.getApplyNo(),
-                                    info.getMessageType() + ":" + info.getMessageId() + ":" + info.getState());
-                            out.collect(info);
+                                //分组缓存
+                                //病人号：流水号：申请单号：状态
+                                resultJedis.rpush(info.getMessageType()
+                                                + ":" + "messageZSetCache"
+                                                + ":" + info.getUpid()
+                                                + ":" + info.getClinicNo()
+                                                + ":" + info.getApplyNo(),
+                                        info.getMessageType() + ":" + info.getMessageId() + ":" + info.getState());
+                                out.collect(info);
+                            }
                         }
                     }
                 }).setParallelism(1)

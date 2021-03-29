@@ -3,6 +3,8 @@ package com.kjl.flink.development.source;
 import com.kjl.flink.development.entity.MessageBaseInfo;
 import com.kjl.flink.development.util.GsonUtil;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.time.DateFormatUtils;
+import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.api.common.serialization.DeserializationSchema;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
 import org.apache.flink.api.java.typeutils.PojoTypeInfo;
@@ -11,6 +13,7 @@ import org.apache.flink.streaming.connectors.kafka.FlinkKafkaConsumer;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.Properties;
 
 @Slf4j
@@ -19,9 +22,11 @@ public class KafkaConsumer {
         Properties consumeProp = new Properties();
         consumeProp.put("bootstrap.servers", url);
         consumeProp.put("group.id", "flink-development");
-        //设置false 则不更新offset
-        consumeProp.put("enable.auto.commit", "false");
-        consumeProp.put("auto.offset.reset", "earliest");
+
+        //设置false 则不更新offset 监控无法查看进度
+        consumeProp.put("enable.auto.commit", "true");
+
+        //consumeProp.put("auto.offset.reset", "earliest");
         //consumeProp.put("auto.offset.reset", "latest");
         consumeProp.put("auto.commit.interval.ms", "1000");
         //consumeProp.put("key.deserializer", "org.apache.kafka.common.serialization.StringDeserializer");
@@ -55,6 +60,12 @@ public class KafkaConsumer {
         //Map<KafkaTopicPartition, Long> specificStartOffsets = new HashMap<>();
         //specificStartOffsets.put(new KafkaTopicPartition("myTopic", 0), 23L);
         //myConsumer.setStartFromSpecificOffsets(specificStartOffsets);
+
+
+        myConsumer.assignTimestampsAndWatermarks(
+                //WatermarkStrategy.forBoundedOutOfOrderness(Duration.ofSeconds(20))
+                WatermarkStrategy.forMonotonousTimestamps()
+        );
         return myConsumer;
     }
 }

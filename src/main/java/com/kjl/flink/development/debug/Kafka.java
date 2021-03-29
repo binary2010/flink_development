@@ -48,6 +48,9 @@ public class Kafka {
             Properties properties = new Properties();
             properties.setProperty("bootstrap.servers", "10.2.200.69:9092,10.2.200.69:9093,10.2.200.69:9094");
             properties.setProperty("group.id", "flink-development");
+            //设置false 则不更新offset 监控无法查看进度
+            properties.put("enable.auto.commit", "true");
+            properties.put("auto.commit.interval.ms", "1000");
 //            FlinkKafkaConsumer<String> myConsumer = new FlinkKafkaConsumer<>("his_hl7", new SimpleStringSchema(), properties);
 //            //myConsumer.setStartFromEarliest();     // start from the earliest record possible
 //            myConsumer.setStartFromLatest();       // start from the latest record
