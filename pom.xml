@@ -109,7 +109,19 @@
                     <artifactId>flink-streaming-java_2.11</artifactId>
                     <groupId>org.apache.flink</groupId>
                 </exclusion>
+                <exclusion>
+                    <artifactId>jedis</artifactId>
+                    <groupId>redis.clients</groupId>
+                </exclusion>
             </exclusions>
+        </dependency>
+
+        <dependency>
+            <groupId>redis.clients</groupId>
+            <artifactId>jedis</artifactId>
+            <version>3.5.2</version>
+            <type>jar</type>
+            <scope>compile</scope>
         </dependency>
 
         <!-- hapi框架 -->

@@ -26,12 +26,7 @@ public class JedisUtil implements Serializable {
 //            jedisPool = new JedisPool(new JedisPoolConfig(), host, port, timeout, password, database);
 //        }
 //    }
-    private Jedis getJedis() {
-        if (jedisPool == null) {
-            throw new NullPointerException();
-        }
-        return jedisPool.getResource();
-    }
+     
 
     public JedisPool getJedisPool() {
         return jedisPool;
@@ -41,33 +36,35 @@ public class JedisUtil implements Serializable {
         this.jedisPool = pool;
     }
 
-    public void returnJedis(Jedis jedis) {
-        if (null != jedis && null != jedisPool) {
-            //jedisPool.getResource();
-        }
-    }
+    
 
-    public void returnBrokenResource(Jedis jedis) {
-        if (null != jedis && null != jedisPool) {
-            //jedisPool.close();
-        }
-    }
+   
 
     public void expire(String key, int seconds) {
         if (seconds < 0) {
             return;
         }
-        Jedis jedis = getJedis();
-        jedis.expire(key, seconds);
-        returnJedis(jedis);
+        try(Jedis jedis=jedisPool.getResource()) {
+            jedis.expire(key, seconds);
+        }
     }
 
 
+    @Deprecated
     public String flushAll() {
-        Jedis jedis = getJedis();
-        String stata = jedis.flushAll();
-        returnJedis(jedis);
-        return stata;
+        try(Jedis jedis=jedisPool.getResource()) {
+            //String stata = jedis.flushAll();
+            String stata = jedis.flushDB();
+            return stata;
+        }
+    }
+
+    public String flushDB() {
+        try(Jedis jedis=jedisPool.getResource()) {
+            //String stata = jedis.flushAll();
+            String stata = jedis.flushDB();
+            return stata;
+        }
     }
 
 
@@ -76,10 +73,11 @@ public class JedisUtil implements Serializable {
     }
 
     public long renamenx(String oldkey, String newkey) {
-        Jedis jedis = getJedis();
-        long status = jedis.renamenx(oldkey, newkey);
-        returnJedis(jedis);
-        return status;
+        try(Jedis jedis=jedisPool.getResource()) {
+            long status = jedis.renamenx(oldkey, newkey);
+
+            return status;
+        }
 
     }
 
@@ -87,41 +85,44 @@ public class JedisUtil implements Serializable {
      * 更改key
      */
     public String rename(byte[] oldkey, byte[] newkey) {
-        Jedis jedis = getJedis();
-        String status = jedis.rename(oldkey, newkey);
-        returnJedis(jedis);
-        return status;
+        try(Jedis jedis=jedisPool.getResource()) {
+            String status = jedis.rename(oldkey, newkey);
+
+            return status;
+        }
     }
 
     /*
      * 设置key的过期时间，以秒为单位             返回值是影响的记录数
      */
     public long expired(String key, int seconds) {
-        Jedis jedis = getJedis();
-        long count = jedis.expire(key, seconds);
-        returnJedis(jedis);
-        return count;
+        try(Jedis jedis=jedisPool.getResource()) {
+            long count = jedis.expire(key, seconds);
+
+            return count;
+        }
     }
 
     /*
      * 设置key的过期时间，它是距历元（即格林威治标准时间 1970年1月1日的00:00:00,格里高利历)的偏移量
      */
     public long expireAt(String key, long timestamp) {
-        Jedis jedis = getJedis();
-        long count = jedis.expireAt(key, timestamp);
-        returnJedis(jedis);
-        return count;
+        try(Jedis jedis=jedisPool.getResource()) {
+            long count = jedis.expireAt(key, timestamp);
+
+            return count;
+        }
     }
 
     /*
      * 查询key的过期时间       以秒为单位的时间表示返回的是指定key的剩余的生存时间
      */
     public long ttl(String key) {
-        Jedis sjedis = getJedis();
-        long len = sjedis.ttl(key);
-        returnJedis(sjedis);
-        return len;
+        try(Jedis jedis=jedisPool.getResource()) {
+            long len = jedis.ttl(key);
 
+            return len;
+        }
     }
 
     /*
@@ -130,10 +131,11 @@ public class JedisUtil implements Serializable {
      * 当移除成功时返回1，key不存在或者移除不成功时返回0
      */
     public long persist(String key) {
-        Jedis jedis = getJedis();
-        long count = jedis.persist(key);
-        returnJedis(jedis);
-        return count;
+        try(Jedis jedis=jedisPool.getResource()) {
+            long count = jedis.persist(key);
+
+            return count;
+        }
     }
 
     /*
@@ -142,30 +144,33 @@ public class JedisUtil implements Serializable {
      * 返回值是被删除的数量
      */
     public long del(String... keys) {
-        Jedis jedis = getJedis();
-        long count = jedis.del(keys);
-        returnJedis(jedis);
-        return count;
+        try(Jedis jedis=jedisPool.getResource()) {
+            long count = jedis.del(keys);
+
+            return count;
+        }
     }
 
     /*
      * 删除keys对应的记录，可以是多个key
      */
     public long del(byte[]... keys) {
-        Jedis jedis = getJedis();
-        long count = jedis.del(keys);
-        returnJedis(jedis);
-        return count;
+        try(Jedis jedis=jedisPool.getResource()) {
+            long count = jedis.del(keys);
+
+            return count;
+        }
     }
 
     /*
      * 判断key是否存在
      */
     public boolean exists(String key) {
-        Jedis jedis = getJedis();
-        boolean exists = jedis.exists(key);
-        returnJedis(jedis);
-        return exists;
+        try(Jedis jedis=jedisPool.getResource()) {
+            boolean exists = jedis.exists(key);
+
+            return exists;
+        }
     }
 
     /*
@@ -174,11 +179,12 @@ public class JedisUtil implements Serializable {
      * 返回排序后的结果，默认升序 sort key Desc为降序
      */
     public List<String> sort(String key) {
-        Jedis jedis = getJedis();
-        List<String> list = jedis.sort(key);
+        try(Jedis jedis=jedisPool.getResource()) {
+            List<String> list = jedis.sort(key);
 
-        returnJedis(jedis);
-        return list;
+
+            return list;
+        }
     }
 
     /*
@@ -187,20 +193,22 @@ public class JedisUtil implements Serializable {
      * 返回排序后的结果，默认升序 sort key Desc为降序
      */
     public List<String> sort(String key, SortingParams parame) {
-        Jedis jedis = getJedis();
-        List<String> list = jedis.sort(key, parame);
-        returnJedis(jedis);
-        return list;
+        try(Jedis jedis=jedisPool.getResource()) {
+            List<String> list = jedis.sort(key, parame);
+
+            return list;
+        }
     }
     /*
      * 返回指定key的存储类型
      */
 
     public String type(String key) {
-        Jedis jedis = getJedis();
-        String type = jedis.type(key);
-        returnJedis(jedis);
-        return type;
+        try(Jedis jedis=jedisPool.getResource()) {
+            String type = jedis.type(key);
+
+            return type;
+        }
     }
 
     /*
@@ -209,11 +217,12 @@ public class JedisUtil implements Serializable {
      * key的查询表达式 *代表任意多个 ？代表一个
      */
     public Set<String> Keys(String pattern) {
-        Jedis jedis = getJedis();
-        Set<String> set = jedis.keys(pattern);
+        try(Jedis jedis=jedisPool.getResource()) {
+            Set<String> set = jedis.keys(pattern);
 
-        returnJedis(jedis);
-        return set;
+
+            return set;
+        }
     }
 
     /*************************set部分*******************************/
@@ -221,18 +230,20 @@ public class JedisUtil implements Serializable {
      * 向set添加一条记录，如果member已经存在则返回0，否则返回1
      */
     public long sadd(String key, String member) {
-        Jedis jedis = getJedis();
+        try(Jedis jedis=jedisPool.getResource()) {
 
-        Long s = jedis.sadd(key, member);
-        returnJedis(jedis);
-        return s;
+            Long s = jedis.sadd(key, member);
+
+            return s;
+        }
     }
 
     public long sadd(byte[] key, byte[] member) {
-        Jedis jedis = getJedis();
-        Long s = jedis.sadd(key, member);
-        returnJedis(jedis);
-        return s;
+        try(Jedis jedis=jedisPool.getResource()) {
+            Long s = jedis.sadd(key, member);
+
+            return s;
+        }
     }
 
     /*
@@ -241,10 +252,11 @@ public class JedisUtil implements Serializable {
      * @return 元素个数
      */
     public long scard(String key) {
-        Jedis jedis = getJedis();
-        Long count = jedis.scard(key);
-        returnJedis(jedis);
-        return count;
+        try(Jedis jedis=jedisPool.getResource()) {
+            Long count = jedis.scard(key);
+
+            return count;
+        }
     }
 
     /*
@@ -253,10 +265,11 @@ public class JedisUtil implements Serializable {
      * @return 有差异成员的集合
      */
     public Set<String> sdiff(String... keys) {
-        Jedis jedis = getJedis();
-        Set<String> set = jedis.sdiff(keys);
-        returnJedis(jedis);
-        return set;
+        try(Jedis jedis=jedisPool.getResource()) {
+            Set<String> set = jedis.sdiff(keys);
+
+            return set;
+        }
     }
 
     /*
@@ -265,10 +278,11 @@ public class JedisUtil implements Serializable {
      * @return  新集合的记录数
      */
     public long sdiffstore(String newkey, String... keys) {
-        Jedis jedis = getJedis();
-        Long count = jedis.sdiffstore(newkey, keys);
-        returnJedis(jedis);
-        return count;
+        try(Jedis jedis=jedisPool.getResource()) {
+            Long count = jedis.sdiffstore(newkey, keys);
+
+            return count;
+        }
     }
 
     /*
@@ -276,10 +290,11 @@ public class JedisUtil implements Serializable {
      * @return 交集成员的集合
      */
     public Set<String> sinter(String... keys) {
-        Jedis jedis = getJedis();
-        Set<String> set = jedis.sinter(keys);
-        returnJedis(jedis);
-        return set;
+        try(Jedis jedis=jedisPool.getResource()) {
+            Set<String> set = jedis.sinter(keys);
+
+            return set;
+        }
     }
 
     /*
@@ -289,10 +304,11 @@ public class JedisUtil implements Serializable {
      * @return 新集合的记录数
      */
     public long sinterstore(String dstkey, String... keys) {
-        Jedis jedis = getJedis();
-        long count = jedis.sinterstore(dstkey, keys);
-        returnJedis(jedis);
-        return count;
+        try(Jedis jedis=jedisPool.getResource()) {
+            long count = jedis.sinterstore(dstkey, keys);
+
+            return count;
+        }
     }
 
     /*
@@ -301,10 +317,11 @@ public class JedisUtil implements Serializable {
      * @return 存在返回1，不存在返回0
      */
     public boolean sismember(String key, String member) {
-        Jedis jedis = getJedis();
+        try(Jedis jedis=jedisPool.getResource()) {
         Boolean s = jedis.sismember(key, member);
-        returnJedis(jedis);
+        
         return s;
+        }
     }
     /*
      * smembers 返回集合中的所有成员
@@ -312,17 +329,19 @@ public class JedisUtil implements Serializable {
      */
 
     public Set<String> smembers(String key) {
-        Jedis jedis = getJedis();
-        Set<String> set = jedis.smembers(key);
-        returnJedis(jedis);
-        return set;
+        try(Jedis jedis=jedisPool.getResource()) {
+            Set<String> set = jedis.smembers(key);
+
+            return set;
+        }
     }
 
     public Set<byte[]> smembers(byte[] key) {
-        Jedis jedis = getJedis();
-        Set<byte[]> set = jedis.smembers(key);
-        returnJedis(jedis);
-        return set;
+        try(Jedis jedis=jedisPool.getResource()) {
+            Set<byte[]> set = jedis.smembers(key);
+
+            return set;
+        }
     }
 
     /*
@@ -334,10 +353,11 @@ public class JedisUtil implements Serializable {
      * @return 状态码 1成功 0失败
      */
     public long smove(String srckey, String dstkey, String member) {
-        Jedis jedis = getJedis();
-        Long s = jedis.smove(srckey, dstkey, member);
-        returnJedis(jedis);
-        return s;
+        try(Jedis jedis=jedisPool.getResource()) {
+            Long s = jedis.smove(srckey, dstkey, member);
+
+            return s;
+        }
     }
 
     /*
@@ -346,10 +366,11 @@ public class JedisUtil implements Serializable {
      * @return 被删除的随机成员
      */
     public String spop(String key) {
-        Jedis jedis = getJedis();
-        String s = jedis.spop(key); //s 被移除的随机成员
-        returnJedis(jedis);
-        return s;
+        try(Jedis jedis=jedisPool.getResource()) {
+            String s = jedis.spop(key); //s 被移除的随机成员
+
+            return s;
+        }
     }
 
     /*
@@ -360,10 +381,11 @@ public class JedisUtil implements Serializable {
      * @return 状态码 成功返回1，成员不存在返回0
      */
     public long srem(String key, String member) {
-        Jedis jedis = getJedis();
-        Long s = jedis.srem(key, member);
-        returnJedis(jedis);
-        return s;
+        try(Jedis jedis=jedisPool.getResource()) {
+            Long s = jedis.srem(key, member);
+
+            return s;
+        }
     }
 
 
@@ -376,10 +398,11 @@ public class JedisUtil implements Serializable {
      * @return 状态码 1成功 0已经存在member值
      */
     public long zadd(String key, double score, String member) {
-        Jedis jedis = getJedis();
-        long s = jedis.zadd(key, score, member);
-        returnJedis(jedis);
-        return s;
+        try(Jedis jedis=jedisPool.getResource()) {
+            long s = jedis.zadd(key, score, member);
+
+            return s;
+        }
     }
 
     /*
@@ -388,10 +411,11 @@ public class JedisUtil implements Serializable {
      * @return 当 key 存在且是有序集类型时，返回有序集的基数。 当 key 不存在时，返回 0 。
      */
     public long zcard(String key) {
-        Jedis jedis = getJedis();
-        long count = jedis.zcard(key);
-        returnJedis(jedis);
-        return count;
+        try(Jedis jedis=jedisPool.getResource()) {
+            long count = jedis.zcard(key);
+
+            return count;
+        }
     }
 
     /*
@@ -400,10 +424,11 @@ public class JedisUtil implements Serializable {
      * @param double min最小排序位置   max最大排序位置
      */
     public long zcount(String key, double min, double max) {
-        Jedis jedis = getJedis();
-        long count = jedis.zcount(key, min, max);
-        returnJedis(jedis);
-        return count;
+        try(Jedis jedis=jedisPool.getResource()) {
+            long count = jedis.zcount(key, min, max);
+
+            return count;
+        }
     }
 
     /*
@@ -411,10 +436,11 @@ public class JedisUtil implements Serializable {
      */
     public Set<String> zrange(String key, int start, int end) {
 
-        Jedis jedis = getJedis();
-        Set<String> set = jedis.zrange(key, 0, -1);
-        returnJedis(jedis);
-        return set;
+        try(Jedis jedis=jedisPool.getResource()) {
+            Set<String> set = jedis.zrange(key, 0, -1);
+
+            return set;
+        }
     }
 
 
@@ -423,20 +449,22 @@ public class JedisUtil implements Serializable {
      */
     public Set<String> zrevrange(String key, int start, int end) {
         // ShardedJedis sjedis = getShardedJedis();
-        Jedis sjedis = getJedis();
-        Set<String> set = sjedis.zrevrange(key, start, end);
-        returnJedis(sjedis);
-        return set;
+        try(Jedis jedis=jedisPool.getResource()) {
+            Set<String> set = jedis.zrevrange(key, start, end);
+
+            return set;
+        }
     }
 
     /*
      * zrangeByScore  根据上下权重查询集合
      */
     public Set<String> zrangeByScore(String key, double min, double max) {
-        Jedis jedis = getJedis();
-        Set<String> set = jedis.zrangeByScore(key, min, max);
-        returnJedis(jedis);
-        return set;
+        try(Jedis jedis=jedisPool.getResource()) {
+            Set<String> set = jedis.zrangeByScore(key, min, max);
+
+            return set;
+        }
     }
 
     /*
@@ -456,30 +484,33 @@ public class JedisUtil implements Serializable {
      */
 
     public double zincrby(String key, double score, String member) {
-        Jedis jedis = getJedis();
-        double s = jedis.zincrby(key, score, member);
-        returnJedis(jedis);
-        return s;
+        try(Jedis jedis=jedisPool.getResource()) {
+            double s = jedis.zincrby(key, score, member);
+
+            return s;
+        }
     }
     /*
      * zrank 返回有序集 key 中成员 member 的排名。其中有序集成员按 score 值递增(从小到大)顺序排列
      */
 
     public long zrank(String key, String member) {
-        Jedis jedis = getJedis();
-        long index = jedis.zrank(key, member);
-        returnJedis(jedis);
-        return index;
+        try(Jedis jedis=jedisPool.getResource()) {
+            long index = jedis.zrank(key, member);
+
+            return index;
+        }
     }
 
     /*
      *zrevrank   返回有序集 key 中成员 member 的排名。其中有序集成员按 score 值递减(从大到小)排序。
      */
     public long zrevrank(String key, String member) {
-        Jedis jedis = getJedis();
-        long index = jedis.zrevrank(key, member);
-        returnJedis(jedis);
-        return index;
+        try(Jedis jedis=jedisPool.getResource()) {
+            long index = jedis.zrevrank(key, member);
+
+            return index;
+        }
     }
 
     /*
@@ -487,10 +518,11 @@ public class JedisUtil implements Serializable {
      * @return 被成功移除的成员的数量，不包括被忽略的成员
      */
     public long zrem(String key, String member) {
-        Jedis jedis = getJedis();
-        long count = jedis.zrem(key, member);
-        returnJedis(jedis);
-        return count;
+        try(Jedis jedis=jedisPool.getResource()) {
+            long count = jedis.zrem(key, member);
+
+            return count;
+        }
 
     }
 
@@ -499,10 +531,11 @@ public class JedisUtil implements Serializable {
      *@return 被移除成员的数量
      */
     public long zremrangeByRank(String key, int start, int end) {
-        Jedis jedis = getJedis();
-        long count = jedis.zremrangeByRank(key, start, end);
-        returnJedis(jedis);
-        return count;
+        try(Jedis jedis=jedisPool.getResource()) {
+            long count = jedis.zremrangeByRank(key, start, end);
+
+            return count;
+        }
 
     }
 
@@ -511,10 +544,11 @@ public class JedisUtil implements Serializable {
      * zremrangeByScore  删除指定权重区间的元素
      */
     public long zremrangeByScore(String key, double min, double max) {
-        Jedis jedis = getJedis();
-        long count = jedis.zremrangeByScore(key, min, max);
-        returnJedis(jedis);
-        return count;
+        try(Jedis jedis=jedisPool.getResource()) {
+            long count = jedis.zremrangeByScore(key, min, max);
+
+            return count;
+        }
     }
 
 
@@ -522,13 +556,14 @@ public class JedisUtil implements Serializable {
      * 获取给定值在集合中的权重
      */
     public double zscore(String key, String member) {
-        Jedis jedis = getJedis();
-        Double score = jedis.zscore(key, member);
-        returnJedis(jedis);
-        if (score != null) {
-            return score;
+        try(Jedis jedis=jedisPool.getResource()) {
+            Double score = jedis.zscore(key, member);
+
+            if (score != null) {
+                return score;
+            }
+            return 0;
         }
-        return 0;
     }
 
 
@@ -541,17 +576,19 @@ public class JedisUtil implements Serializable {
      * @return 状态码，1成功，0失败
      */
     public long hdel(String key, String fieid) {
-        Jedis jedis = getJedis();
-        long s = jedis.hdel(key, fieid);
-        returnJedis(jedis);
-        return s;
+        try(Jedis jedis=jedisPool.getResource()) {
+            long s = jedis.hdel(key, fieid);
+
+            return s;
+        }
     }
 
     public long hdel(String key) {
-        Jedis jedis = getJedis();
-        long s = jedis.del(key);
-        returnJedis(jedis);
-        return s;
+        try(Jedis jedis=jedisPool.getResource()) {
+            long s = jedis.del(key);
+
+            return s;
+        }
     }
 
     /**
@@ -563,10 +600,11 @@ public class JedisUtil implements Serializable {
      */
     public boolean hexists(String key, String fieid) {
         // ShardedJedis sjedis = getShardedJedis();
-        Jedis sjedis = getJedis();
-        boolean s = sjedis.hexists(key, fieid);
-        returnJedis(sjedis);
-        return s;
+        try(Jedis jedis=jedisPool.getResource()) {
+            boolean s = jedis.hexists(key, fieid);
+
+            return s;
+        }
     }
 
     /**
@@ -578,18 +616,19 @@ public class JedisUtil implements Serializable {
      */
     public String hget(String key, String fieid) {
         // ShardedJedis sjedis = getShardedJedis();
-        Jedis sjedis = getJedis();
-        String s = sjedis.hget(key, fieid);
-        returnJedis(sjedis);
-        return s;
+        try(Jedis jedis=jedisPool.getResource()) {
+            String s = jedis.hget(key, fieid);
+
+            return s;
+        }
     }
 
     public byte[] hget(byte[] key, byte[] fieid) {
         // ShardedJedis sjedis = getShardedJedis();
-        Jedis sjedis = getJedis();
-        byte[] s = sjedis.hget(key, fieid);
-        returnJedis(sjedis);
-        return s;
+        try(Jedis jedis=jedisPool.getResource()) {
+            byte[] s = jedis.hget(key, fieid);
+            return s;
+        }
     }
 
     /**
@@ -600,10 +639,11 @@ public class JedisUtil implements Serializable {
      */
     public Map<String, String> hgetAll(String key) {
         // ShardedJedis sjedis = getShardedJedis();
-        Jedis sjedis = getJedis();
-        Map<String, String> map = sjedis.hgetAll(key);
-        returnJedis(sjedis);
-        return map;
+        try(Jedis jedis=jedisPool.getResource()) {
+            Map<String, String> map = jedis.hgetAll(key);
+
+            return map;
+        }
     }
 
     /**
@@ -615,17 +655,19 @@ public class JedisUtil implements Serializable {
      * @return 状态码 1成功，0失败，fieid已存在将更新，也返回0
      **/
     public long hset(String key, String fieid, String value) {
-        Jedis jedis = getJedis();
-        long s = jedis.hset(key, fieid, value);
-        returnJedis(jedis);
-        return s;
+        try(Jedis jedis=jedisPool.getResource()) {
+            long s = jedis.hset(key, fieid, value);
+
+            return s;
+        }
     }
 
     public long hset(String key, String fieid, byte[] value) {
-        Jedis jedis = getJedis();
-        long s = jedis.hset(key.getBytes(), fieid.getBytes(), value);
-        returnJedis(jedis);
-        return s;
+        try(Jedis jedis=jedisPool.getResource()) {
+            long s = jedis.hset(key.getBytes(), fieid.getBytes(), value);
+
+            return s;
+        }
     }
 
     /**
@@ -637,10 +679,11 @@ public class JedisUtil implements Serializable {
      * @return 状态码 1成功，0失败fieid已存
      **/
     public long hsetnx(String key, String fieid, String value) {
-        Jedis jedis = getJedis();
-        long s = jedis.hsetnx(key, fieid, value);
-        returnJedis(jedis);
-        return s;
+        try(Jedis jedis=jedisPool.getResource()) {
+            long s = jedis.hsetnx(key, fieid, value);
+
+            return s;
+        }
     }
 
     /**
@@ -651,10 +694,11 @@ public class JedisUtil implements Serializable {
      */
     public List<String> hvals(String key) {
         // ShardedJedis sjedis = getShardedJedis();
-        Jedis sjedis = getJedis();
-        List<String> list = sjedis.hvals(key);
-        returnJedis(sjedis);
-        return list;
+        try(Jedis jedis=jedisPool.getResource()) {
+            List<String> list = jedis.hvals(key);
+
+            return list;
+        }
     }
 
     /**
@@ -666,10 +710,11 @@ public class JedisUtil implements Serializable {
      * @return 增加指定数字后，存储位置的值
      */
     public long hincrby(String key, String fieid, long value) {
-        Jedis jedis = getJedis();
-        long s = jedis.hincrBy(key, fieid, value);
-        returnJedis(jedis);
-        return s;
+        try(Jedis jedis=jedisPool.getResource()) {
+            long s = jedis.hincrBy(key, fieid, value);
+
+            return s;
+        }
     }
 
     /**
@@ -680,10 +725,11 @@ public class JedisUtil implements Serializable {
      */
     public Set<String> hkeys(String key) {
         // ShardedJedis sjedis = getShardedJedis();
-        Jedis sjedis = getJedis();
-        Set<String> set = sjedis.hkeys(key);
-        returnJedis(sjedis);
-        return set;
+        try(Jedis jedis=jedisPool.getResource()) {
+            Set<String> set = jedis.hkeys(key);
+
+            return set;
+        }
     }
 
     /**
@@ -694,10 +740,10 @@ public class JedisUtil implements Serializable {
      */
     public long hlen(String key) {
         // ShardedJedis sjedis = getShardedJedis();
-        Jedis sjedis = getJedis();
-        long len = sjedis.hlen(key);
-        returnJedis(sjedis);
-        return len;
+        try(Jedis jedis=jedisPool.getResource()) {
+            long len = jedis.hlen(key);
+            return len;
+        }
     }
 
     /**
@@ -709,18 +755,18 @@ public class JedisUtil implements Serializable {
      */
     public List<String> hmget(String key, String... fieids) {
         // ShardedJedis sjedis = getShardedJedis();
-        Jedis sjedis = getJedis();
-        List<String> list = sjedis.hmget(key, fieids);
-        returnJedis(sjedis);
-        return list;
+        try(Jedis jedis=jedisPool.getResource()) {
+            List<String> list = jedis.hmget(key, fieids);
+            return list;
+        }
     }
 
     public List<byte[]> hmget(byte[] key, byte[]... fieids) {
         // ShardedJedis sjedis = getShardedJedis();
-        Jedis sjedis = getJedis();
-        List<byte[]> list = sjedis.hmget(key, fieids);
-        returnJedis(sjedis);
-        return list;
+        try(Jedis jedis=jedisPool.getResource()) {
+            List<byte[]> list = jedis.hmget(key, fieids);
+            return list;
+        }
     }
 
     /**
@@ -731,10 +777,11 @@ public class JedisUtil implements Serializable {
      * @return 状态，成功返回OK
      */
     public String hmset(String key, Map<String, String> map) {
-        Jedis jedis = getJedis();
-        String s = jedis.hmset(key, map);
-        returnJedis(jedis);
-        return s;
+        try(Jedis jedis=jedisPool.getResource()) {
+            String s = jedis.hmset(key, map);
+
+            return s;
+        }
     }
 
     /**
@@ -745,10 +792,11 @@ public class JedisUtil implements Serializable {
      * @return 状态，成功返回OK
      */
     public String hmset(byte[] key, Map<byte[], byte[]> map) {
-        Jedis jedis = getJedis();
-        String s = jedis.hmset(key, map);
-        returnJedis(jedis);
-        return s;
+        try(Jedis jedis=jedisPool.getResource()) {
+            String s = jedis.hmset(key, map);
+
+            return s;
+        }
     }
 
     // *******************************************Strings*******************************************//
@@ -761,10 +809,11 @@ public class JedisUtil implements Serializable {
      */
     public String get(String key) {
         // ShardedJedis sjedis = getShardedJedis();
-        Jedis sjedis = getJedis();
-        String value = sjedis.get(key);
-        returnJedis(sjedis);
-        return value;
+        try(Jedis jedis=jedisPool.getResource()) {
+            String value = jedis.get(key);
+
+            return value;
+        }
     }
 
     /**
@@ -775,10 +824,11 @@ public class JedisUtil implements Serializable {
      */
     public byte[] get(byte[] key) {
         // ShardedJedis sjedis = getShardedJedis();
-        Jedis sjedis = getJedis();
-        byte[] value = sjedis.get(key);
-        returnJedis(sjedis);
-        return value;
+        try(Jedis jedis=jedisPool.getResource()) {
+            byte[] value = jedis.get(key);
+
+            return value;
+        }
     }
 
     /**
@@ -790,10 +840,11 @@ public class JedisUtil implements Serializable {
      * @return String 操作状态
      */
     public String setEx(String key, int seconds, String value) {
-        Jedis jedis = getJedis();
-        String str = jedis.setex(key, seconds, value);
-        returnJedis(jedis);
-        return str;
+        try(Jedis jedis=jedisPool.getResource()) {
+            String str = jedis.setex(key, seconds, value);
+
+            return str;
+        }
     }
 
     /**
@@ -805,10 +856,11 @@ public class JedisUtil implements Serializable {
      * @return String 操作状态
      */
     public String setEx(byte[] key, int seconds, byte[] value) {
-        Jedis jedis = getJedis();
-        String str = jedis.setex(key, seconds, value);
-        returnJedis(jedis);
-        return str;
+        try(Jedis jedis=jedisPool.getResource()) {
+            String str = jedis.setex(key, seconds, value);
+
+            return str;
+        }
     }
 
     /**
@@ -819,10 +871,11 @@ public class JedisUtil implements Serializable {
      * @return long 状态码，1插入成功且key不存在，0未插入，key存在
      */
     public long setnx(String key, String value) {
-        Jedis jedis = getJedis();
-        long str = jedis.setnx(key, value);
-        returnJedis(jedis);
-        return str;
+        try(Jedis jedis=jedisPool.getResource()) {
+            long str = jedis.setnx(key, value);
+
+            return str;
+        }
     }
 
     /**
@@ -855,10 +908,11 @@ public class JedisUtil implements Serializable {
      * @return 状态码
      */
     public String set(byte[] key, byte[] value) {
-        Jedis jedis = getJedis();
-        String status = jedis.set(key, value);
-        returnJedis(jedis);
-        return status;
+        try(Jedis jedis=jedisPool.getResource()) {
+            String status = jedis.set(key, value);
+
+            return status;
+        }
     }
 
     /**
@@ -872,10 +926,11 @@ public class JedisUtil implements Serializable {
      * @return long value的长度
      */
     public long setRange(String key, long offset, String value) {
-        Jedis jedis = getJedis();
-        long len = jedis.setrange(key, offset, value);
-        returnJedis(jedis);
-        return len;
+        try(Jedis jedis=jedisPool.getResource()) {
+            long len = jedis.setrange(key, offset, value);
+
+            return len;
+        }
     }
 
     /**
@@ -886,10 +941,11 @@ public class JedisUtil implements Serializable {
      * @return long 追加后value的长度
      **/
     public long append(String key, String value) {
-        Jedis jedis = getJedis();
-        long len = jedis.append(key, value);
-        returnJedis(jedis);
-        return len;
+        try(Jedis jedis=jedisPool.getResource()) {
+            long len = jedis.append(key, value);
+
+            return len;
+        }
     }
 
     /**
@@ -900,10 +956,11 @@ public class JedisUtil implements Serializable {
      * @return long 减指定值后的值
      */
     public long decrBy(String key, long number) {
-        Jedis jedis = getJedis();
-        long len = jedis.decrBy(key, number);
-        returnJedis(jedis);
-        return len;
+        try(Jedis jedis=jedisPool.getResource()) {
+            long len = jedis.decrBy(key, number);
+
+            return len;
+        }
     }
 
     /**
@@ -915,10 +972,11 @@ public class JedisUtil implements Serializable {
      * @return long 相加后的值
      */
     public long incrBy(String key, long number) {
-        Jedis jedis = getJedis();
-        long len = jedis.incrBy(key, number);
-        returnJedis(jedis);
-        return len;
+        try(Jedis jedis=jedisPool.getResource()) {
+            long len = jedis.incrBy(key, number);
+
+            return len;
+        }
     }
 
     /**
@@ -931,10 +989,11 @@ public class JedisUtil implements Serializable {
      */
     public String getrange(String key, long startOffset, long endOffset) {
         // ShardedJedis sjedis = getShardedJedis();
-        Jedis sjedis = getJedis();
-        String value = sjedis.getrange(key, startOffset, endOffset);
-        returnJedis(sjedis);
-        return value;
+        try(Jedis jedis=jedisPool.getResource()) {
+            String value = jedis.getrange(key, startOffset, endOffset);
+
+            return value;
+        }
     }
 
     /**
@@ -946,10 +1005,11 @@ public class JedisUtil implements Serializable {
      * @return String 原始value或null
      */
     public String getSet(String key, String value) {
-        Jedis jedis = getJedis();
-        String str = jedis.getSet(key, value);
-        returnJedis(jedis);
-        return str;
+        try(Jedis jedis=jedisPool.getResource()) {
+            String str = jedis.getSet(key, value);
+
+            return str;
+        }
     }
 
     /**
@@ -959,10 +1019,11 @@ public class JedisUtil implements Serializable {
      * @return List<String> 值得集合
      */
     public List<String> mget(String... keys) {
-        Jedis jedis = getJedis();
-        List<String> str = jedis.mget(keys);
-        returnJedis(jedis);
-        return str;
+        try(Jedis jedis=jedisPool.getResource()) {
+            List<String> str = jedis.mget(keys);
+
+            return str;
+        }
     }
 
     /**
@@ -972,10 +1033,11 @@ public class JedisUtil implements Serializable {
      * @return String 状态码
      */
     public String mset(String... keysvalues) {
-        Jedis jedis = getJedis();
-        String str = jedis.mset(keysvalues);
-        returnJedis(jedis);
-        return str;
+        try(Jedis jedis=jedisPool.getResource()) {
+            String str = jedis.mset(keysvalues);
+
+            return str;
+        }
     }
 
     /**
@@ -985,10 +1047,11 @@ public class JedisUtil implements Serializable {
      * @return value值得长度
      */
     public long strlen(String key) {
-        Jedis jedis = getJedis();
-        long len = jedis.strlen(key);
-        returnJedis(jedis);
-        return len;
+        try(Jedis jedis=jedisPool.getResource()) {
+            long len = jedis.strlen(key);
+
+            return len;
+        }
     }
 
     // *******************************************Lists*******************************************//
@@ -1011,10 +1074,10 @@ public class JedisUtil implements Serializable {
      */
     public long llen(byte[] key) {
         // ShardedJedis sjedis = getShardedJedis();
-        Jedis sjedis = getJedis();
-        long count = sjedis.llen(key);
-        returnJedis(sjedis);
-        return count;
+        try(Jedis jedis=jedisPool.getResource()) {
+            long count = jedis.llen(key);
+            return count;
+        }
     }
 
     /**
@@ -1026,10 +1089,11 @@ public class JedisUtil implements Serializable {
      * @return 状态码
      */
     public String lset(byte[] key, int index, byte[] value) {
-        Jedis jedis = getJedis();
-        String status = jedis.lset(key, index, value);
-        returnJedis(jedis);
-        return status;
+        try(Jedis jedis=jedisPool.getResource()) {
+            String status = jedis.lset(key, index, value);
+
+            return status;
+        }
     }
 
     /**
@@ -1067,10 +1131,11 @@ public class JedisUtil implements Serializable {
      **/
     public byte[] lindex(byte[] key, int index) {
         // ShardedJedis sjedis = getShardedJedis();
-        Jedis sjedis = getJedis();
-        byte[] value = sjedis.lindex(key, index);
-        returnJedis(sjedis);
-        return value;
+        try(Jedis jedis=jedisPool.getResource()) {
+            byte[] value = jedis.lindex(key, index);
+
+            return value;
+        }
     }
 
     /**
@@ -1090,10 +1155,11 @@ public class JedisUtil implements Serializable {
      * @return 移出的记录
      */
     public byte[] lpop(byte[] key) {
-        Jedis jedis = getJedis();
-        byte[] value = jedis.lpop(key);
-        returnJedis(jedis);
-        return value;
+        try(Jedis jedis=jedisPool.getResource()) {
+            byte[] value = jedis.lpop(key);
+
+            return value;
+        }
     }
 
     /**
@@ -1103,10 +1169,11 @@ public class JedisUtil implements Serializable {
      * @return 移出的记录
      */
     public String rpop(String key) {
-        Jedis jedis = getJedis();
-        String value = jedis.rpop(key);
-        returnJedis(jedis);
-        return value;
+        try(Jedis jedis=jedisPool.getResource()) {
+            String value = jedis.rpop(key);
+
+            return value;
+        }
     }
 
     /**
@@ -1117,7 +1184,8 @@ public class JedisUtil implements Serializable {
      * @return 记录总数
      */
     public long lpush(String key, String value) {
-        return lpush(SafeEncoder.encode(key), SafeEncoder.encode(value));
+        return 0;
+        //return lpush(SafeEncoder.encode(key), SafeEncoder.encode(value));
     }
 
     /**
@@ -1128,10 +1196,10 @@ public class JedisUtil implements Serializable {
      * @return 记录总数
      */
     public long rpush(String key, String value) {
-        Jedis jedis = getJedis();
-        long count = jedis.rpush(key, value);
-        returnJedis(jedis);
-        return count;
+        try(Jedis jedis=jedisPool.getResource()) {
+            long count = jedis.rpush(key, value);
+            return count;
+        }
     }
 
     /**
@@ -1142,10 +1210,11 @@ public class JedisUtil implements Serializable {
      * @return 记录总数
      */
     public long rpush(byte[] key, byte[] value) {
-        Jedis jedis = getJedis();
-        long count = jedis.rpush(key, value);
-        returnJedis(jedis);
-        return count;
+        try(Jedis jedis=jedisPool.getResource()) {
+            long count = jedis.rpush(key, value);
+
+            return count;
+        }
     }
 
     /**
@@ -1156,10 +1225,11 @@ public class JedisUtil implements Serializable {
      * @return 记录总数
      */
     public long lpush(byte[] key, byte[] value) {
-        Jedis jedis = getJedis();
-        long count = jedis.lpush(key, value);
-        returnJedis(jedis);
-        return count;
+        try(Jedis jedis=jedisPool.getResource()) {
+            long count = jedis.lpush(key, value);
+
+            return count;
+        }
     }
 
     /**
@@ -1172,10 +1242,11 @@ public class JedisUtil implements Serializable {
      */
     public List<String> lrange(String key, long start, long end) {
         // ShardedJedis sjedis = getShardedJedis();
-        Jedis sjedis = getJedis();
-        List<String> list = sjedis.lrange(key, start, end);
-        returnJedis(sjedis);
-        return list;
+        try(Jedis jedis=jedisPool.getResource()) {
+            List<String> list = jedis.lrange(key, start, end);
+
+            return list;
+        }
     }
 
     /**
@@ -1188,10 +1259,11 @@ public class JedisUtil implements Serializable {
      */
     public List<byte[]> lrange(byte[] key, int start, int end) {
         // ShardedJedis sjedis = getShardedJedis();
-        Jedis sjedis = getJedis();
-        List<byte[]> list = sjedis.lrange(key, start, end);
-        returnJedis(sjedis);
-        return list;
+        try(Jedis jedis=jedisPool.getResource()) {
+            List<byte[]> list = jedis.lrange(key, start, end);
+
+            return list;
+        }
     }
 
     /**
@@ -1203,10 +1275,11 @@ public class JedisUtil implements Serializable {
      * @return 删除后的List中的记录数
      */
     public long lrem(byte[] key, int c, byte[] value) {
-        Jedis jedis = getJedis();
-        long count = jedis.lrem(key, c, value);
-        returnJedis(jedis);
-        return count;
+        try(Jedis jedis=jedisPool.getResource()) {
+            long count = jedis.lrem(key, c, value);
+
+            return count;
+        }
     }
 
     /**
@@ -1230,10 +1303,11 @@ public class JedisUtil implements Serializable {
      * @return 执行状态码
      */
     public String ltrim(byte[] key, int start, int end) {
-        Jedis jedis = getJedis();
-        String str = jedis.ltrim(key, start, end);
-        returnJedis(jedis);
-        return str;
+        try(Jedis jedis=jedisPool.getResource()) {
+            String str = jedis.ltrim(key, start, end);
+
+            return str;
+        }
     }
 
     /**

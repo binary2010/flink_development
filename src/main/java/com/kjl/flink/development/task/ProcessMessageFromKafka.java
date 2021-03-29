@@ -61,14 +61,14 @@ public class ProcessMessageFromKafka implements Serializable {
         //JedisUtil resultJedis = new JedisUtil();
         //JedisPool resultPool = new JedisPool(new JedisPoolConfig(), host, port, 1000, null, 1);
         resultJedis.setJedisPool(resultPool);
-        resultJedis.flushAll();
-        resultJedis.set("abc","123");
+        resultJedis.flushDB();
+        //resultJedis.set("abc","123");
 
         //JedisUtil cacheJedis = new JedisUtil();
         //JedisPool cachePool = new JedisPool(new JedisPoolConfig(), host, port, 1000, null, 2);
         cacheJedis.setJedisPool(cachePool);
-        cacheJedis.flushAll();
-        cacheJedis.set("efg","456");
+        cacheJedis.flushDB();
+        //cacheJedis.set("efg","456");
 
 
         FlinkJedisPoolConfig conf = new FlinkJedisPoolConfig.Builder()
