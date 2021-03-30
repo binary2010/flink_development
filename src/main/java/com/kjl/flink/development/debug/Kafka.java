@@ -25,6 +25,7 @@ import redis.clients.jedis.JedisPoolConfig;
 
 import java.util.List;
 import java.util.Properties;
+import java.util.Set;
 
 import static com.kjl.flink.development.util.MessageDecodeUtil.transforMessage;
 
@@ -78,11 +79,18 @@ public class Kafka {
             resultJedis.flushDB();
             resultJedis.set("abc","123");
 
+
+
             cacheJedis.setJedisPool(cachePool);
             Jedis cache=cacheJedis.getJedisPool().getResource();
             cacheJedis.set("efg","456");
             cacheJedis.flushDB();
             cacheJedis.set("efg","456");
+            Long aa=cacheJedis.zadd("msgabc",11,"kdkdkdkdk");
+            Long a=cacheJedis.zadd("msgabc",12,"k1212212dkdkdkdk");
+            //VALUE
+            Set<String> bb=cacheJedis.zrange("msgabc",0,-1);
+
 
 
             FlinkJedisPoolConfig conf = new FlinkJedisPoolConfig.Builder()

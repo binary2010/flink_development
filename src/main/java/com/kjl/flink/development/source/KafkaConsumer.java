@@ -51,8 +51,8 @@ public class KafkaConsumer {
                 return TypeExtractor.createTypeInfo(MessageBaseInfo.class);
             }
         }, consumeProp);
-        //myConsumer.setStartFromEarliest();     // start from the earliest record possible
-        myConsumer.setStartFromLatest();       // start from the latest record
+        myConsumer.setStartFromEarliest();     // start from the earliest record possible
+        //myConsumer.setStartFromLatest();       // start from the latest record
         //myConsumer.setStartFromTimestamp(...); // start from specified epoch timestamp (milliseconds)
         //myConsumer.setStartFromGroupOffsets(); // the default behaviour
 

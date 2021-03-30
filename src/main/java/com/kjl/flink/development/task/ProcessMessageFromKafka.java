@@ -32,15 +32,16 @@ import java.io.Serializable;
 import java.sql.Timestamp;
 import java.time.Duration;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 import static com.kjl.flink.development.util.MessageDecodeUtil.transforMessage;
 
 @Slf4j
 public class ProcessMessageFromKafka implements Serializable {
-    static String host = "10.2.200.68";
+    static String host = "10.2.200.132";
     static int port = 6379;
-    static String password = "2021oeoeiekkfsfiijwejskdjfksdfkdf";
+    static String password = "2018@HkuszhRedis!!!";
     static String kafkaServers = "10.2.200.69:9092,10.2.200.69:9093,10.2.200.69:9094";
     static String toptic = "his_hl7";
 
@@ -54,7 +55,7 @@ public class ProcessMessageFromKafka implements Serializable {
     @SuppressWarnings("unchecked")
     public static void main(String[] args) throws Exception {
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
-        //env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime);
+        env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime);
         env.setParallelism(1);
         PojoTypeInfo<MessageBaseInfo> pojoType = (PojoTypeInfo<MessageBaseInfo>) TypeExtractor.createTypeInfo(MessageBaseInfo.class);
 
@@ -84,8 +85,8 @@ public class ProcessMessageFromKafka implements Serializable {
                             if (cacheJedis.exists("message:"+messageInfo.getMsgid())) {
                                 return;
                             }
-                            //缓存3600秒
-                            cacheJedis.setEx("message:"+messageInfo.getMsgid(), 3600, "");
+                            //缓存3600*100秒
+                            cacheJedis.setEx("message:"+messageInfo.getMsgid(), 360000, "");
 
                             log.info("flink处理消息,id:{},type:{},时间:{}", messageInfo.getMsgid(), messageInfo.getMsgtype(),
                                     DateFormatUtils.format(messageInfo.getDatecreated(), "yyyy-MM-dd HH:mm:ss"));
@@ -95,12 +96,24 @@ public class ProcessMessageFromKafka implements Serializable {
 //                                    DateFormatUtils.format(info.getDateCreated(),"yyyy-MM-dd HH:mm:ss"));
                                 //分组缓存
                                 //病人号：流水号：申请单号：状态
-                                resultJedis.rpush(info.getMessageType()
-                                                + ":" + "messageZSetCache"
-                                                + ":" + info.getUpid()
-                                                + ":" + info.getClinicNo()
-                                                + ":" + info.getApplyNo(),
-                                        info.getMessageType() + ":" + info.getMessageId() + ":" + info.getState());
+//                                resultJedis.rpush(info.getMessageType()
+//                                                + ":" + "messageZSetCache"
+//                                                + ":" + info.getUpid()
+//                                                + ":" + info.getClinicNo()
+//                                                + ":" + info.getApplyNo(),
+//                                        info.getMessageType() + ":" + info.getMessageId() + ":" + info.getState());
+
+                                //考虑处理分发乱序
+                                resultJedis.zadd(
+//                                        info.getMessageType()
+//                                        + ":" +
+                                                "messageZSetCache"
+                                        + ":" + info.getUpid()
+                                        + ":" + info.getClinicNo()
+                                        + ":" + info.getApplyNo(),info.getDateCreated().getTime(),
+                                        info.getMessageType()
+                                                + ":" + info.getMessageId()
+                                                + ":" + info.getState());
                                 out.collect(info);
                             }
                         }
@@ -115,18 +128,20 @@ public class ProcessMessageFromKafka implements Serializable {
                     }
                 })
                 .setParallelism(1)
+                //窗口周期 10小时
                 .timeWindowAll(Time.hours(10))
                 .apply(new AllWindowFunction<MessageProcessInfo, Tuple2<String, String>, TimeWindow>() {
                     @Override
                     public void apply(TimeWindow window, Iterable<MessageProcessInfo> input, Collector<Tuple2<String, String>> out) throws Exception {
-                        StringBuilder result = new StringBuilder();
-                        result.delete(0, result.length());
+                        StringBuilder resultSb = new StringBuilder();
+                        resultSb.delete(0, resultSb.length());
                         for (MessageProcessInfo info : input) {
-                            result.delete(0, result.length());
+                            resultSb.delete(0, resultSb.length());
 
-                            List<String> cache = resultJedis.lrange(
-                                    info.getMessageType()
-                                            + ":" + "messageZSetCache"
+                            Set<String> cache = resultJedis.zrange(
+//                                    info.getMessageType()
+//                                            + ":" +
+                                            "messageZSetCache"
                                             + ":" + info.getUpid()
                                             + ":" + info.getClinicNo()
                                             + ":" + info.getApplyNo(),
@@ -137,7 +152,7 @@ public class ProcessMessageFromKafka implements Serializable {
                             switch (info.getMessageType()) {
                                 case "OML_O21":
                                 case "OMG_O19":
-                                    cacheState = cache.get(0);
+                                    cacheState = cache.iterator().next();
                                     cacheInfo = cacheState.split(":");
 
                                     //类型顺序不一致
@@ -150,15 +165,15 @@ public class ProcessMessageFromKafka implements Serializable {
                                                 info.getApplyNo(), info.getMessageType(), info.getMessageId(), info.getState(),
                                                 cacheInfo[0], cacheInfo[1], cacheInfo[2]
                                         );
-                                        result = buildResult(result, info.getMessageType() + "消息顺序错误", info, cacheInfo);
+                                        resultSb = buildResult(resultSb, info.getMessageType() + "消息顺序错误", info, cacheInfo);
 
-                                        Tuple2<String, String> saveDate = new Tuple2<>(info.getMessageType() + "消息顺序错误:" + new Timestamp(window.getEnd()) + ":" + info.getUpid(), result.toString());
+                                        Tuple2<String, String> saveDate = new Tuple2<>(info.getMessageType() + "消息顺序错误:" + new Timestamp(window.getEnd()) + ":" + info.getUpid(), resultSb.toString());
                                         out.collect(saveDate);
                                     }
                                     break;
                                 case "ORL_O22":
                                 case "ORG_O20":
-                                    cacheState = cache.get(0);
+                                    cacheState = cache.iterator().next();
                                     cacheInfo = cacheState.split(":");
                                     if (cacheInfo[0].equals(info.getMessageType())) {
                                         log.info("没有申请消息,创建时间：{},申请单号：{},当前信息：{},{},{},历史信息：{},{},{}",
@@ -166,9 +181,9 @@ public class ProcessMessageFromKafka implements Serializable {
                                                 info.getApplyNo(), info.getMessageType(), info.getMessageId(), info.getState(),
                                                 cacheInfo[0], cacheInfo[1], cacheInfo[2]
                                         );
-                                        result = buildResult(result, info.getMessageType() + "没有申请消息", info, cacheInfo);
+                                        resultSb = buildResult(resultSb, info.getMessageType() + "没有申请消息", info, cacheInfo);
 
-                                        Tuple2<String, String> saveDate = new Tuple2<>(info.getMessageType() + "没有申请消息:" + new Timestamp(window.getEnd()) + ":" + info.getUpid(), result.toString());
+                                        Tuple2<String, String> saveDate = new Tuple2<>(info.getMessageType() + "没有申请消息:" + new Timestamp(window.getEnd()) + ":" + info.getUpid(), resultSb.toString());
                                         out.collect(saveDate);
                                     } else if (("OML_O21".equals(cacheInfo[0]) && !"NW".equals(cacheInfo[2]))
                                             || ("OMG_O19".equals(cacheInfo[0]) && !"NW".equals(cacheInfo[2]))) {
@@ -177,9 +192,9 @@ public class ProcessMessageFromKafka implements Serializable {
                                                 info.getApplyNo(), info.getMessageType(), info.getMessageId(), info.getState(),
                                                 cacheInfo[0], cacheInfo[1], cacheInfo[2]
                                         );
-                                        result = buildResult(result, info.getMessageType() + "没有NW申请消息", info, cacheInfo);
+                                        resultSb = buildResult(resultSb, info.getMessageType() + "没有NW申请消息", info, cacheInfo);
 
-                                        Tuple2<String, String> saveDate = new Tuple2<>(info.getMessageType() + "没有NW申请消息:" + new Timestamp(window.getEnd()) + ":" + info.getUpid(), result.toString());
+                                        Tuple2<String, String> saveDate = new Tuple2<>(info.getMessageType() + "没有NW申请消息:" + new Timestamp(window.getEnd()) + ":" + info.getUpid(), resultSb.toString());
                                         out.collect(saveDate);
                                     }
                                     break;
