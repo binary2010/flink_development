@@ -62,6 +62,7 @@ public class ProcessMessageFromKafka implements Serializable {
     public static void main(String[] args) throws Exception {
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime);
+
         env.setParallelism(1);
         PojoTypeInfo<MessageBaseInfo> pojoType = (PojoTypeInfo<MessageBaseInfo>) TypeExtractor.createTypeInfo(MessageBaseInfo.class);
 
@@ -155,17 +156,22 @@ public class ProcessMessageFromKafka implements Serializable {
                         }
                     }
                 }).setParallelism(1)
-                .assignTimestampsAndWatermarks(new AscendingTimestampExtractor<MessageProcessInfo>() {
-                    @Override
-                    public long extractAscendingTimestamp(MessageProcessInfo info) {
-//                        log.info("抽取时间戳,id:{},type:{},时间:{}",info.getMessageId(),info.getMessageType(),
-//                                DateFormatUtils.format(info.getDateCreated(),"yyyy-MM-dd HH:mm:ss"));
-                        return info.getDateCreated().getTime();
-                    }
-                })
-                .setParallelism(1)
+//				.assignTimestampsAndWatermarks(new AscendingTimestampExtractor<MessageProcessInfo>() {
+//                    @Override
+//                    public long extractAscendingTimestamp(MessageProcessInfo info) {
+////                        log.info("抽取时间戳,id:{},type:{},时间:{}",info.getMessageId(),info.getMessageType(),
+////                                DateFormatUtils.format(info.getDateCreated(),"yyyy-MM-dd HH:mm:ss"));
+//                        return info.getDateCreated().getTime();
+//                    }
+//                })
+                .assignTimestampsAndWatermarks(WatermarkStrategy
+                        .<MessageProcessInfo>forBoundedOutOfOrderness(Duration.ofHours(10))
+                        .withTimestampAssigner((event, timestamp) -> event.getDateCreated().getTime())
+                        .withIdleness(Duration.ofMinutes(10))
+
+                )
                 //窗口周期 10小时
-                .timeWindowAll(Time.days(10))
+                .timeWindowAll(Time.hours(10))
                 .apply(new AllWindowFunction<MessageProcessInfo, Tuple2<String, String>, TimeWindow>() {
                     @Override
                     public void apply(TimeWindow window, Iterable<MessageProcessInfo> input, Collector<Tuple2<String, String>> out) throws Exception {
