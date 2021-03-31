@@ -324,7 +324,8 @@ public class MessageDecodeUtil {
                 MessageProcessInfo processInfo = new MessageProcessInfo();
                 processInfo.setState("NW");
                 processInfo.setDateCreated(messageInfo.getDatecreated());
-                //processInfo.setMessageType(msg.getName());
+                processInfo.setMsgsender(messageInfo.getMsgsender());
+                processInfo.setMsgreceiver(messageInfo.getMsgreceiver());
 
                 switch (msg.getVersion()) {
                     case "2.3":

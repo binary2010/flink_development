@@ -39,7 +39,7 @@ import static com.kjl.flink.development.util.MessageDecodeUtil.transforMessage;
 
 @Slf4j
 public class ProcessMessageFromKafka implements Serializable {
-    static String host = "10.2.200.132";
+    static String host = "10.2.84.129";
     static int port = 6379;
     static String password = "2018@HkuszhRedis!!!";
     static String kafkaServers = "10.2.200.69:9092,10.2.200.69:9093,10.2.200.69:9094";
@@ -107,13 +107,17 @@ public class ProcessMessageFromKafka implements Serializable {
                                 resultJedis.zadd(
 //                                        info.getMessageType()
 //                                        + ":" +
-                                                "messageZSetCache"
-                                        + ":" + info.getUpid()
-                                        + ":" + info.getClinicNo()
-                                        + ":" + info.getApplyNo(),info.getDateCreated().getTime(),
+                                        "messageZSetCache"
+                                                + ":" + info.getUpid()
+                                                + ":" + info.getClinicNo()
+                                                + ":" + info.getApplyNo()
+                                        , info.getDateCreated().getTime(),
                                         info.getMessageType()
                                                 + ":" + info.getMessageId()
-                                                + ":" + info.getState());
+                                                + ":" + info.getState()
+                                                + ":" + info.getMsgsender()
+                                                + ":" + DateFormatUtils.format(info.getDateCreated(), "yyyy-MM-dd HH:mm:ss")
+                                );
                                 out.collect(info);
                             }
                         }

@@ -25,4 +25,7 @@ public class MessageProcessInfo {
     private String itemName;
 
     private String state;
+
+    private String msgsender;
+    private String msgreceiver;
 }

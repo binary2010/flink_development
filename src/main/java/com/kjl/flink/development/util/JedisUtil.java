@@ -1,10 +1,7 @@
 package com.kjl.flink.development.util;
 
 import lombok.extern.slf4j.Slf4j;
-import redis.clients.jedis.BinaryClient;
-import redis.clients.jedis.Jedis;
-import redis.clients.jedis.JedisPool;
-import redis.clients.jedis.SortingParams;
+import redis.clients.jedis.*;
 import redis.clients.jedis.util.SafeEncoder;
 
 import java.io.Serializable;
@@ -17,18 +14,32 @@ import java.util.Set;
  */
 @Slf4j
 public class JedisUtil implements Serializable {
-    private final int expire = 60000;
 
-    private JedisPool jedisPool;
+//    String host = "10.2.84.129";
+//    int port = 6379;
+//    String password = "2018@HkuszhRedis!!!";
+//
+//    private final int expire = 60000;
+//
+
+//
+//    public JedisUtil(){
+//        getJedisPool();
+//    }
 
     //    public JedisUtil(String host,int port,int timeout,String password,int database){
 //        if(jedisPool==null) {
 //            jedisPool = new JedisPool(new JedisPoolConfig(), host, port, timeout, password, database);
 //        }
 //    }
-     
+
+   private JedisPool jedisPool;
 
     public JedisPool getJedisPool() {
+//        if(jedisPool==null){
+//            jedisPool=new JedisPool(new JedisPoolConfig(),
+//                    host, port, 1000, password, 3);
+//        }
         return jedisPool;
     }
 
@@ -1184,8 +1195,7 @@ public class JedisUtil implements Serializable {
      * @return 记录总数
      */
     public long lpush(String key, String value) {
-        return 0;
-        //return lpush(SafeEncoder.encode(key), SafeEncoder.encode(value));
+        return lpush(SafeEncoder.encode(key), SafeEncoder.encode(value));
     }
 
     /**

@@ -162,7 +162,9 @@ public class MessageBaseInfoFromJdbc extends RichParallelSourceFunction<MessageB
 
                 int count;
                 try (Connection connection = MySQLUtil.getConnection()) {
-                    String sql = "select a.id id,a.msg_id msg_id,a.msg_type msg_type,a.date_created date_created,a.raw_data raw_data from hl7_message a where a.date_created > to_date(?,'yyyy-MM-dd hh24:mi:ss') and a.date_created<=to_date(?,'yyyy-MM-dd hh24:mi:ss') and a.type='Source' and (a.msg_type='OML^O21'or a.msg_type='ORL^O22' or a.msg_type='OMG^O19' or a.msg_type='ORG^O20') order by a.date_created,a.msg_id";
+                    String sql = "select a.id id,a.msg_id msg_id,a.msg_type msg_type,a.date_created date_created," +
+                            "a.msg_receiver msg_receiver,a.msg_sender msg_sender"+
+                            "a.raw_data raw_data from hl7_message a where a.date_created > to_date(?,'yyyy-MM-dd hh24:mi:ss') and a.date_created<=to_date(?,'yyyy-MM-dd hh24:mi:ss') and a.type='Source' and (a.msg_type='OML^O21'or a.msg_type='ORL^O22' or a.msg_type='OMG^O19' or a.msg_type='ORG^O20') order by a.date_created,a.msg_id";
                     PreparedStatement ps = connection.prepareStatement(sql);
                     ps.setString(1, DateFormatUtils.format(begin, "yyyy-MM-dd HH:mm:ss"));
                     ps.setString(2, DateFormatUtils.format(end, "yyyy-MM-dd HH:mm:ss"));
@@ -175,6 +177,8 @@ public class MessageBaseInfoFromJdbc extends RichParallelSourceFunction<MessageB
                                 resultSet.getString("msg_id"),
                                 resultSet.getString("msg_type"),
                                 resultSet.getTimestamp("date_created"),
+                                resultSet.getString("msg_receiver"),
+                                resultSet.getString("msg_sender"),
                                 converClobToString(resultSet.getClob("raw_data"))
                         );
                         msgQueue.put(baseInfo);

@@ -15,4 +15,6 @@ public class MessageBaseInfo {
     private String msgtype;
     private Date datecreated;
     private String msg;
+    private String msgsender;
+    private String msgreceiver;
 }
