@@ -32,18 +32,30 @@ public class FraudDetectionJob {
 	public static void main(String[] args) throws Exception {
 		StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
 
-		DataStream<Transaction> transactions = env
-			.addSource(new TransactionSource())
-			.name("transactions");
+//		DataStream<Transaction> transactions = env
+//			.addSource(new TransactionSource())
+//			.name("transactions");
+//
+//		DataStream<Alert> alerts = transactions
+//			.keyBy(Transaction::getAccountId)
+//			.process(new FraudDetector())
+//			.name("fraud-detector");
+//
+//		alerts
+//			.addSink(new AlertSink())
+//			.name("send-alerts");
 
-		DataStream<Alert> alerts = transactions
-			.keyBy(Transaction::getAccountId)
-			.process(new FraudDetector())
-			.name("fraud-detector");
 
-		alerts
-			.addSink(new AlertSink())
-			.name("send-alerts");
+		 env
+				.addSource(new TransactionSource())
+				.name("transactions")
+
+				.keyBy(Transaction::getAccountId)
+				.process(new FraudDetector())
+				.name("fraud-detector")
+
+				.addSink(new AlertSink())
+				.name("send-alerts");
 
 		env.execute("Fraud Detection");
 	}

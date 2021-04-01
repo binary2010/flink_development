@@ -3,34 +3,37 @@ package com.kjl.flink.development.task;
 import com.kjl.flink.development.entity.MessageBaseInfo;
 import com.kjl.flink.development.entity.MessageProcessInfo;
 import com.kjl.flink.development.sink.RedisSinkMapper;
-import com.kjl.flink.development.source.KafkaConsumer;
 import com.kjl.flink.development.util.GsonUtil;
 import com.kjl.flink.development.util.JedisUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.time.DateFormatUtils;
 import org.apache.flink.api.common.JobExecutionResult;
+import org.apache.flink.api.common.eventtime.SerializableTimestampAssigner;
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
 import org.apache.flink.api.common.functions.FlatMapFunction;
 import org.apache.flink.api.common.serialization.DeserializationSchema;
+import org.apache.flink.api.common.state.ValueState;
+import org.apache.flink.api.common.state.ValueStateDescriptor;
 import org.apache.flink.api.common.typeinfo.TypeInformation;
+import org.apache.flink.api.common.typeinfo.Types;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.api.java.typeutils.PojoTypeInfo;
 import org.apache.flink.api.java.typeutils.TypeExtractor;
+import org.apache.flink.configuration.Configuration;
 import org.apache.flink.streaming.api.TimeCharacteristic;
 import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
-import org.apache.flink.streaming.api.functions.timestamps.AscendingTimestampExtractor;
-import org.apache.flink.streaming.api.functions.timestamps.BoundedOutOfOrdernessTimestampExtractor;
+import org.apache.flink.streaming.api.functions.KeyedProcessFunction;
 import org.apache.flink.streaming.api.functions.windowing.AllWindowFunction;
-import org.apache.flink.streaming.api.windowing.assigners.TumblingEventTimeWindows;
 import org.apache.flink.streaming.api.windowing.time.Time;
 import org.apache.flink.streaming.api.windowing.windows.TimeWindow;
 import org.apache.flink.streaming.connectors.kafka.FlinkKafkaConsumer;
 import org.apache.flink.streaming.connectors.redis.RedisSink;
 import org.apache.flink.streaming.connectors.redis.common.config.FlinkJedisPoolConfig;
-import org.apache.flink.streaming.runtime.operators.util.AssignerWithPeriodicWatermarksAdapter;
 import org.apache.flink.util.Collector;
+import org.apache.flink.walkthrough.common.entity.Alert;
 import redis.clients.jedis.JedisPool;
 import redis.clients.jedis.JedisPoolConfig;
+import redis.clients.jedis.Pipeline;
 
 import java.io.IOException;
 import java.io.Serializable;
@@ -121,58 +124,174 @@ public class ProcessMessageFromKafka implements Serializable {
                             //缓存3600*100秒
                             cacheJedis.setEx("message:"+messageInfo.getMsgid(), 360000, "");
 
-//                            log.info("flink处理消息,id:{},type:{},时间:{}", messageInfo.getMsgid(), messageInfo.getMsgtype(),
-//                                    DateFormatUtils.format(messageInfo.getDatecreated(), "yyyy-MM-dd HH:mm:ss"));
                             List<MessageProcessInfo> list = transforMessage(messageInfo);
                             for (MessageProcessInfo info : list) {
-//                            log.info("缓存消息,id:{},type:{},时间:{}",info.getMessageId(),info.getMessageType(),
-//                                    DateFormatUtils.format(info.getDateCreated(),"yyyy-MM-dd HH:mm:ss"));
-                                //分组缓存
-                                //病人号：流水号：申请单号：状态
-//                                resultJedis.rpush(info.getMessageType()
-//                                                + ":" + "messageZSetCache"
-//                                                + ":" + info.getUpid()
-//                                                + ":" + info.getClinicNo()
-//                                                + ":" + info.getApplyNo(),
-//                                        info.getMessageType() + ":" + info.getMessageId() + ":" + info.getState());
-
-                                //考虑处理分发乱序
-                                resultJedis.zadd(
+                                if(info.getApplyNo()!=null) {
+                                    resultJedis.zadd(
 //                                        info.getMessageType()
 //                                        + ":" +
-                                        "messageZSetCache"
-                                                + ":" + info.getUpid()
-                                                + ":" + info.getClinicNo()
-                                                + ":" + info.getApplyNo()
-                                        , info.getDateCreated().getTime(),
-                                        info.getMessageType()
-                                                + ":" + info.getMessageId()
-                                                + ":" + info.getState()
-                                                + ":" + info.getMsgsender()
-                                                + ":" + info.getMsgreceiver()
-                                                + ":" + DateFormatUtils.format(info.getDateCreated(), "yyyy-MM-dd HH:mm:ss")
-                                );
-                                out.collect(info);
+                                            "messageZSetCache"
+                                                    + ":" + info.getUpid()
+                                                    + ":" + info.getClinicNo()
+                                                    + ":" + info.getApplyNo()
+                                            , info.getDateCreated().getTime(),
+                                            info.getMessageType()
+                                                    + ":" + info.getMessageId()
+                                                    + ":" + info.getState()
+                                                    + ":" + info.getMsgsender()
+                                                    + ":" + info.getMsgreceiver()
+                                                    + ":" + DateFormatUtils.format(info.getDateCreated(), "yyyy-MM-dd HH:mm:ss")
+                                    );
+                                    out.collect(info);
+                                }
                             }
                         }
                     }
-                }).setParallelism(1)
-//				.assignTimestampsAndWatermarks(new AscendingTimestampExtractor<MessageProcessInfo>() {
-//                    @Override
-//                    public long extractAscendingTimestamp(MessageProcessInfo info) {
-////                        log.info("抽取时间戳,id:{},type:{},时间:{}",info.getMessageId(),info.getMessageType(),
-////                                DateFormatUtils.format(info.getDateCreated(),"yyyy-MM-dd HH:mm:ss"));
-//                        return info.getDateCreated().getTime();
-//                    }
-//                })
+                })
+                .setParallelism(1)
                 .assignTimestampsAndWatermarks(WatermarkStrategy
                         .<MessageProcessInfo>forBoundedOutOfOrderness(Duration.ofHours(10))
-                        .withTimestampAssigner((event, timestamp) -> event.getDateCreated().getTime())
+                        .withTimestampAssigner(new SerializableTimestampAssigner<MessageProcessInfo>() {
+                            @Override
+                            public long extractTimestamp(MessageProcessInfo event, long timestamp) {
+                                return event.getDateCreated().getTime();
+                            }
+                        })
                         .withIdleness(Duration.ofMinutes(10))
 
-                ).keyBy(MessageProcessInfo::getApplyNo)
-                //窗口周期 10小时
-                .timeWindowAll(Time.hours(10))
+                )
+                .keyBy(MessageProcessInfo::getApplyNo)
+//                .process(new KeyedProcessFunction<String, MessageProcessInfo, Tuple2<String, String>>() {
+//                    private transient ValueState<Boolean> flagState;
+//                    private transient ValueState<Long> timerState;
+//
+//
+//                    @Override
+//                    public void open(Configuration parameters){
+//
+//                        ValueStateDescriptor<Boolean> flagDescriptor = new ValueStateDescriptor<>(
+//                                "flag",
+//                                Types.BOOLEAN);
+//                        flagState = getRuntimeContext().getState(flagDescriptor);
+//
+//                        ValueStateDescriptor<Long> timerDescriptor = new ValueStateDescriptor<>(
+//                                "timer-state",
+//                                Types.LONG);
+//                        timerState = getRuntimeContext().getState(timerDescriptor);
+//                    }
+//
+//                    @Override
+//                    public void processElement(MessageProcessInfo info, Context ctx, Collector<Tuple2<String, String>> out) throws Exception {
+//                        StringBuilder resultSb = new StringBuilder();
+//                        resultSb.delete(0, resultSb.length());
+//
+//                        Set<String> cache = resultJedis.zrange(
+////                                    info.getMessageType()
+////                                            + ":" +
+//                                "messageZSetCache"
+//                                        + ":" + info.getUpid()
+//                                        + ":" + info.getClinicNo()
+//                                        + ":" + info.getApplyNo(),
+//                                0, -1);
+//
+//                        String cacheState;
+//                        String[] cacheInfo;
+//                        cacheState = cache.iterator().next();
+//                        cacheInfo = cacheState.split(":");
+//
+//                        long cacheMsgId = 0;
+//                        long currentMsgId = 0;
+//                        try {
+//                            cacheMsgId = Long.parseLong(cacheInfo[1]);
+//                            currentMsgId = Long.parseLong(info.getMessageId());
+//                        } catch (Exception e) {
+//
+//                        }
+//                        switch (info.getMessageType()) {
+//                            case "OML_O21":
+//                            case "OMG_O19":
+//
+//                                //类型顺序不一致
+//                                //状态顺序不一致
+//
+//                                //OML_O21:273049144:NW:CIS:EAI:2021-03-30
+//                                if ((!cacheInfo[0].equals(info.getMessageType())
+//                                        || ("RU".equals(cacheInfo[2]) && "NW".equals(info.getState())))
+//                                        && cacheMsgId < currentMsgId
+//                                        && cacheInfo[4] != info.getMsgreceiver()
+//                                ) {
+//                                    log.info("消息顺序错误,创建时间：{},申请单号：{},当前信息：{},{},{},历史信息：{},{},{}",
+//                                            DateFormatUtils.format(info.getDateCreated(), "yyyy-MM-dd HH:mm:ss"),
+//                                            info.getApplyNo(), info.getMessageType(), info.getMessageId(), info.getState(),
+//                                            cacheInfo[0], cacheInfo[1], cacheInfo[2]
+//                                    );
+//                                    resultSb = buildResult(resultSb, info.getMessageType() + "消息顺序错误", info, cacheInfo);
+//
+//                                    Tuple2<String, String> saveDate = new Tuple2<>(info.getMessageType()
+//                                            + "消息顺序错误:"
+//                                            //+ new Timestamp(window.getEnd())
+//                                            + ":" + info.getUpid(), resultSb.toString());
+//                                    out.collect(saveDate);
+//                                }
+//                                break;
+//                            case "ORL_O22":
+//                            case "ORG_O20":
+//
+//                                if (cacheInfo[0].equals(info.getMessageType()) && cacheInfo[4].equals(info.getMsgreceiver())) {
+//                                    log.info("没有申请消息,创建时间：{},申请单号：{},当前信息：{},{},{},历史信息：{},{},{}",
+//                                            DateFormatUtils.format(info.getDateCreated(), "yyyy-MM-dd HH:mm:ss"),
+//                                            info.getApplyNo(), info.getMessageType(), info.getMessageId(), info.getState(),
+//                                            cacheInfo[0], cacheInfo[1], cacheInfo[2]
+//                                    );
+//                                    resultSb = buildResult(resultSb, info.getMessageType() + "没有申请消息", info, cacheInfo);
+//
+//                                    Tuple2<String, String> saveDate = new Tuple2<>(info.getMessageType()
+//                                            + "没有申请消息:"
+//                                            //+ new Timestamp(window.getEnd())
+//                                            + ":" + info.getUpid(), resultSb.toString());
+//                                    out.collect(saveDate);
+//                                } else if ((("OML_O21".equals(cacheInfo[0]) && !"NW".equals(cacheInfo[2]))
+//                                        || ("OMG_O19".equals(cacheInfo[0]) && !"NW".equals(cacheInfo[2])))
+//                                        && (cacheInfo[4].equals(info.getMsgreceiver()))) {
+//                                    log.info("没有NW申请消息,创建时间：{},申请单号：{},当前信息：{},{},{},历史信息：{},{},{}",
+//                                            DateFormatUtils.format(info.getDateCreated(), "yyyy-MM-dd HH:mm:ss"),
+//                                            info.getApplyNo(), info.getMessageType(), info.getMessageId(), info.getState(),
+//                                            cacheInfo[0], cacheInfo[1], cacheInfo[2]
+//                                    );
+//                                    resultSb = buildResult(resultSb, info.getMessageType() + "没有NW申请消息", info, cacheInfo);
+//
+//                                    Tuple2<String, String> saveDate = new Tuple2<>(info.getMessageType()
+//                                            + "没有NW申请消息:"
+//                                            //+ new Timestamp(window.getEnd())
+//                                            + ":" + info.getUpid(), resultSb.toString());
+//                                    out.collect(saveDate);
+//                                }
+//                                break;
+//                            default:
+//                                break;
+//                        }
+//                    }
+//
+//
+//                    @Override
+//                    public void onTimer(long timestamp, OnTimerContext ctx, Collector<Tuple2<String, String>> out) {
+//                        // remove flag after 1 minute
+//                        timerState.clear();
+//                        flagState.clear();
+//                    }
+//
+//                    private void cleanUp(Context ctx) throws Exception {
+//                        // delete timer
+//                        Long timer = timerState.value();
+//                        ctx.timerService().deleteProcessingTimeTimer(timer);
+//
+//                        // clean up all state
+//                        timerState.clear();
+//                        flagState.clear();
+//                    }
+//
+//                })
+                .timeWindowAll(Time.seconds(30))
                 .apply(new AllWindowFunction<MessageProcessInfo, Tuple2<String, String>, TimeWindow>() {
                     @Override
                     public void apply(TimeWindow window, Iterable<MessageProcessInfo> input, Collector<Tuple2<String, String>> out) throws Exception {
@@ -184,7 +303,7 @@ public class ProcessMessageFromKafka implements Serializable {
                             Set<String> cache = resultJedis.zrange(
 //                                    info.getMessageType()
 //                                            + ":" +
-                                            "messageZSetCache"
+                                    "messageZSetCache"
                                             + ":" + info.getUpid()
                                             + ":" + info.getClinicNo()
                                             + ":" + info.getApplyNo(),
@@ -195,13 +314,12 @@ public class ProcessMessageFromKafka implements Serializable {
                             cacheState = cache.iterator().next();
                             cacheInfo = cacheState.split(":");
 
-                            long cacheMsgId=0;
-                            long currentMsgId=0;
-                            try{
+                            long cacheMsgId = 0;
+                            long currentMsgId = 0;
+                            try {
                                 cacheMsgId = Long.parseLong(cacheInfo[1]);
                                 currentMsgId = Long.parseLong(info.getMessageId());
-                            }
-                            catch (Exception e){
+                            } catch (Exception e) {
 
                             }
                             switch (info.getMessageType()) {
@@ -214,8 +332,8 @@ public class ProcessMessageFromKafka implements Serializable {
                                     //OML_O21:273049144:NW:CIS:EAI:2021-03-30
                                     if ((!cacheInfo[0].equals(info.getMessageType())
                                             || ("RU".equals(cacheInfo[2]) && "NW".equals(info.getState())))
-                                            &&cacheMsgId<currentMsgId
-                                            &&cacheInfo[4]!=info.getMsgreceiver()
+                                            && cacheMsgId < currentMsgId
+                                            && cacheInfo[4] != info.getMsgreceiver()
                                     ) {
                                         log.info("消息顺序错误,创建时间：{},申请单号：{},当前信息：{},{},{},历史信息：{},{},{}",
                                                 DateFormatUtils.format(info.getDateCreated(), "yyyy-MM-dd HH:mm:ss"),
@@ -231,7 +349,7 @@ public class ProcessMessageFromKafka implements Serializable {
                                 case "ORL_O22":
                                 case "ORG_O20":
 
-                                    if (cacheInfo[0].equals(info.getMessageType())&&cacheInfo[4].equals(info.getMsgreceiver())) {
+                                    if (cacheInfo[0].equals(info.getMessageType()) && cacheInfo[4].equals(info.getMsgreceiver())) {
                                         log.info("没有申请消息,创建时间：{},申请单号：{},当前信息：{},{},{},历史信息：{},{},{}",
                                                 DateFormatUtils.format(info.getDateCreated(), "yyyy-MM-dd HH:mm:ss"),
                                                 info.getApplyNo(), info.getMessageType(), info.getMessageId(), info.getState(),
@@ -243,8 +361,7 @@ public class ProcessMessageFromKafka implements Serializable {
                                         out.collect(saveDate);
                                     } else if ((("OML_O21".equals(cacheInfo[0]) && !"NW".equals(cacheInfo[2]))
                                             || ("OMG_O19".equals(cacheInfo[0]) && !"NW".equals(cacheInfo[2])))
-                                        &&(cacheInfo[4].equals(info.getMsgreceiver())))
-                                    {
+                                            && (cacheInfo[4].equals(info.getMsgreceiver()))) {
                                         log.info("没有NW申请消息,创建时间：{},申请单号：{},当前信息：{},{},{},历史信息：{},{},{}",
                                                 DateFormatUtils.format(info.getDateCreated(), "yyyy-MM-dd HH:mm:ss"),
                                                 info.getApplyNo(), info.getMessageType(), info.getMessageId(), info.getState(),
@@ -260,7 +377,6 @@ public class ProcessMessageFromKafka implements Serializable {
                                     break;
                             }
                         }
-
                     }
                 })
                 .addSink(redisSink).name("redis_sink");

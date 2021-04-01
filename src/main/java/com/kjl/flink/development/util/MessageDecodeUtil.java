@@ -373,6 +373,8 @@ public class MessageDecodeUtil {
                             case "MFN_M04":
                             case "MFN_M15":
                             case "MFQ_M15":
+                            case "ADT_ZP4":
+                            case "ADT_ZV3":
                                 break;
                             case "ADT_A01":
                             case "ADT_A02":
@@ -381,8 +383,7 @@ public class MessageDecodeUtil {
                             case "ADT_A15":
                             case "ADT_A16":
                             case "ADT_A54":
-                            case "ADT_ZP4":
-                            case "ADT_ZV3":
+
                             case "DFT_P03":
                             case "SQM_ZQ1":
                                 pid = (PID) msg.get("PID");
