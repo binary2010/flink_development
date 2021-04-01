@@ -21,6 +21,7 @@ import org.apache.flink.streaming.api.environment.StreamExecutionEnvironment;
 import org.apache.flink.streaming.api.functions.timestamps.AscendingTimestampExtractor;
 import org.apache.flink.streaming.api.functions.timestamps.BoundedOutOfOrdernessTimestampExtractor;
 import org.apache.flink.streaming.api.functions.windowing.AllWindowFunction;
+import org.apache.flink.streaming.api.windowing.assigners.TumblingEventTimeWindows;
 import org.apache.flink.streaming.api.windowing.time.Time;
 import org.apache.flink.streaming.api.windowing.windows.TimeWindow;
 import org.apache.flink.streaming.connectors.kafka.FlinkKafkaConsumer;
@@ -169,7 +170,7 @@ public class ProcessMessageFromKafka implements Serializable {
                         .withTimestampAssigner((event, timestamp) -> event.getDateCreated().getTime())
                         .withIdleness(Duration.ofMinutes(10))
 
-                )
+                ).keyBy(MessageProcessInfo::getApplyNo)
                 //窗口周期 10小时
                 .timeWindowAll(Time.hours(10))
                 .apply(new AllWindowFunction<MessageProcessInfo, Tuple2<String, String>, TimeWindow>() {
