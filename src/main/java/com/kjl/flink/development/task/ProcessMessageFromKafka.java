@@ -58,20 +58,30 @@ public class ProcessMessageFromKafka implements Serializable {
     static JedisUtil resultJedis = new JedisUtil();
     static JedisUtil cacheJedis = new JedisUtil();
     static JedisPool resultPool = new JedisPool(new JedisPoolConfig(),
-            host, port, 1000, password, 1);
+            host, port, 10000, password, 1);
     static JedisPool cachePool = new JedisPool(new JedisPoolConfig(),
-            host, port, 1000, password, 2);
+            host, port, 10000, password, 2);
 
     @SuppressWarnings("unchecked")
     public static void main(String[] args) throws Exception {
+        host="10.2.200.5";
+        port=16379;
+        password="20211223fdfsdfsdfdf@$%ssfpoooiSEEWWEE";
+
+        JedisPool resultPool = new JedisPool(new JedisPoolConfig(),
+                host, port, 10000, password, 1);
+        JedisPool cachePool = new JedisPool(new JedisPoolConfig(),
+                host, port, 10000, password, 2);
+
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime);
 
-        env.setParallelism(1);
+        env.setParallelism(4);
         PojoTypeInfo<MessageBaseInfo> pojoType = (PojoTypeInfo<MessageBaseInfo>) TypeExtractor.createTypeInfo(MessageBaseInfo.class);
 
         resultJedis.setJedisPool(resultPool);
         resultJedis.flushDB();
+        resultJedis.flushAll();
 
         cacheJedis.setJedisPool(cachePool);
         cacheJedis.flushDB();
@@ -91,7 +101,7 @@ public class ProcessMessageFromKafka implements Serializable {
         properties.setProperty("group.id", "flink-development");
         properties.put("enable.auto.commit", "true");
         properties.put("auto.commit.interval.ms", "1000");
-        FlinkKafkaConsumer<MessageBaseInfo> myConsumer = new FlinkKafkaConsumer<MessageBaseInfo>("his_hl7",
+        FlinkKafkaConsumer<MessageBaseInfo> myConsumer = new FlinkKafkaConsumer<MessageBaseInfo>("his_hl7_development",
                 new DeserializationSchema<MessageBaseInfo>() {
                     @Override
                     public MessageBaseInfo deserialize(byte[] bytes) throws IOException {
@@ -109,6 +119,7 @@ public class ProcessMessageFromKafka implements Serializable {
                     }
                 }, properties);
         myConsumer.setStartFromEarliest();
+        //myConsumer.setStartFromLatest();
 
 
         env
@@ -117,49 +128,52 @@ public class ProcessMessageFromKafka implements Serializable {
                     @Override
                     public void flatMap(MessageBaseInfo messageInfo, Collector<MessageProcessInfo> out) throws Exception {
                         if(messageInfo.getMsgid()!=null) {
-                            //重复过滤
-                            if (cacheJedis.exists("message:"+messageInfo.getMsgid())) {
-                                return;
-                            }
-                            //缓存3600*100秒
-                            cacheJedis.setEx("message:"+messageInfo.getMsgid(), 360000, "");
+//                            //重复过滤
+//                            if (cacheJedis.exists("message:"+messageInfo.getMsgid())) {
+//                                return;
+//                            }
+//                            //缓存3600*100秒
+//                            cacheJedis.setEx("message:"+messageInfo.getMsgid(), 360000, "");
 
-                            List<MessageProcessInfo> list = transforMessage(messageInfo);
-                            for (MessageProcessInfo info : list) {
-                                if(info.getApplyNo()!=null) {
-                                    resultJedis.zadd(
+                            if(cacheJedis.setnx("message:"+messageInfo.getMsgid(), "")==1) {
+
+                                List<MessageProcessInfo> list = transforMessage(messageInfo);
+                                for (MessageProcessInfo info : list) {
+                                    if (info.getApplyNo() != null) {
+                                        resultJedis.zadd(
 //                                        info.getMessageType()
 //                                        + ":" +
-                                            "messageZSetCache"
-                                                    + ":" + info.getUpid()
-                                                    + ":" + info.getClinicNo()
-                                                    + ":" + info.getApplyNo()
-                                            , info.getDateCreated().getTime(),
-                                            info.getMessageType()
-                                                    + ":" + info.getMessageId()
-                                                    + ":" + info.getState()
-                                                    + ":" + info.getMsgsender()
-                                                    + ":" + info.getMsgreceiver()
-                                                    + ":" + DateFormatUtils.format(info.getDateCreated(), "yyyy-MM-dd HH:mm:ss")
-                                    );
-                                    out.collect(info);
+                                                "messageZSetCache"
+                                                        + ":" + info.getUpid()
+                                                        + ":" + info.getClinicNo()
+                                                        + ":" + info.getApplyNo()
+                                                , info.getDateCreated().getTime(),
+                                                info.getMessageType()
+                                                        + ":" + info.getMessageId()
+                                                        + ":" + info.getState()
+                                                        + ":" + info.getMsgsender()
+                                                        + ":" + info.getMsgreceiver()
+                                                        + ":" + DateFormatUtils.format(info.getDateCreated(), "yyyy-MM-dd HH:mm:ss")
+                                        );
+                                        out.collect(info);
+                                    }
                                 }
                             }
                         }
                     }
                 })
-                .setParallelism(1)
+                .setParallelism(4)
                 .assignTimestampsAndWatermarks(WatermarkStrategy
-                        .<MessageProcessInfo>forBoundedOutOfOrderness(Duration.ofHours(10))
+                        .<MessageProcessInfo>forBoundedOutOfOrderness(Duration.ofSeconds(60))
                         .withTimestampAssigner(new SerializableTimestampAssigner<MessageProcessInfo>() {
                             @Override
                             public long extractTimestamp(MessageProcessInfo event, long timestamp) {
                                 return event.getDateCreated().getTime();
                             }
                         })
-                        .withIdleness(Duration.ofMinutes(10))
+                        .withIdleness(Duration.ofSeconds(30))
 
-                )
+                ).setParallelism(4)
                 .keyBy(MessageProcessInfo::getApplyNo)
 //                .process(new KeyedProcessFunction<String, MessageProcessInfo, Tuple2<String, String>>() {
 //                    private transient ValueState<Boolean> flagState;
@@ -291,10 +305,11 @@ public class ProcessMessageFromKafka implements Serializable {
 //                    }
 //
 //                })
-                .timeWindowAll(Time.seconds(30))
+                .timeWindowAll(Time.hours(8))
                 .apply(new AllWindowFunction<MessageProcessInfo, Tuple2<String, String>, TimeWindow>() {
                     @Override
                     public void apply(TimeWindow window, Iterable<MessageProcessInfo> input, Collector<Tuple2<String, String>> out) throws Exception {
+                        log.info("当前窗口:{}",new Timestamp(window.getEnd()));
                         StringBuilder resultSb = new StringBuilder();
                         resultSb.delete(0, resultSb.length());
                         for (MessageProcessInfo info : input) {
@@ -335,7 +350,7 @@ public class ProcessMessageFromKafka implements Serializable {
                                             && cacheMsgId < currentMsgId
                                             && cacheInfo[4] != info.getMsgreceiver()
                                     ) {
-                                        log.info("消息顺序错误,创建时间：{},申请单号：{},当前信息：{},{},{},历史信息：{},{},{}",
+                                        log.debug("消息顺序错误,创建时间：{},申请单号：{},当前信息：{},{},{},历史信息：{},{},{}",
                                                 DateFormatUtils.format(info.getDateCreated(), "yyyy-MM-dd HH:mm:ss"),
                                                 info.getApplyNo(), info.getMessageType(), info.getMessageId(), info.getState(),
                                                 cacheInfo[0], cacheInfo[1], cacheInfo[2]
@@ -350,7 +365,7 @@ public class ProcessMessageFromKafka implements Serializable {
                                 case "ORG_O20":
 
                                     if (cacheInfo[0].equals(info.getMessageType()) && cacheInfo[4].equals(info.getMsgreceiver())) {
-                                        log.info("没有申请消息,创建时间：{},申请单号：{},当前信息：{},{},{},历史信息：{},{},{}",
+                                        log.debug("没有申请消息,创建时间：{},申请单号：{},当前信息：{},{},{},历史信息：{},{},{}",
                                                 DateFormatUtils.format(info.getDateCreated(), "yyyy-MM-dd HH:mm:ss"),
                                                 info.getApplyNo(), info.getMessageType(), info.getMessageId(), info.getState(),
                                                 cacheInfo[0], cacheInfo[1], cacheInfo[2]
@@ -362,7 +377,7 @@ public class ProcessMessageFromKafka implements Serializable {
                                     } else if ((("OML_O21".equals(cacheInfo[0]) && !"NW".equals(cacheInfo[2]))
                                             || ("OMG_O19".equals(cacheInfo[0]) && !"NW".equals(cacheInfo[2])))
                                             && (cacheInfo[4].equals(info.getMsgreceiver()))) {
-                                        log.info("没有NW申请消息,创建时间：{},申请单号：{},当前信息：{},{},{},历史信息：{},{},{}",
+                                        log.debug("没有NW申请消息,创建时间：{},申请单号：{},当前信息：{},{},{},历史信息：{},{},{}",
                                                 DateFormatUtils.format(info.getDateCreated(), "yyyy-MM-dd HH:mm:ss"),
                                                 info.getApplyNo(), info.getMessageType(), info.getMessageId(), info.getState(),
                                                 cacheInfo[0], cacheInfo[1], cacheInfo[2]
@@ -378,7 +393,7 @@ public class ProcessMessageFromKafka implements Serializable {
                             }
                         }
                     }
-                })
+                }).setParallelism(1)
                 .addSink(redisSink).name("redis_sink");
         JobExecutionResult result = env.execute("My Flink Job");
         log.info("job execute time:{}", result.getNetRuntime(TimeUnit.SECONDS));

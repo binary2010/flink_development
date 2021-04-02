@@ -64,8 +64,7 @@ public class JedisUtil implements Serializable {
     @Deprecated
     public String flushAll() {
         try(Jedis jedis=jedisPool.getResource()) {
-            //String stata = jedis.flushAll();
-            String stata = jedis.flushDB();
+            String stata = jedis.flushAll();
             return stata;
         }
     }
