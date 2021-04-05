@@ -309,6 +309,7 @@ public class ProcessMessageFromKafka implements Serializable {
                 .apply(new AllWindowFunction<MessageProcessInfo, Tuple2<String, String>, TimeWindow>() {
                     @Override
                     public void apply(TimeWindow window, Iterable<MessageProcessInfo> input, Collector<Tuple2<String, String>> out) throws Exception {
+                        // 计算窗口内数据
                         log.info("当前窗口:{}",new Timestamp(window.getEnd()));
                         StringBuilder resultSb = new StringBuilder();
                         resultSb.delete(0, resultSb.length());
@@ -328,6 +329,12 @@ public class ProcessMessageFromKafka implements Serializable {
                             String[] cacheInfo;
                             cacheState = cache.iterator().next();
                             cacheInfo = cacheState.split(":");
+                            String cacheMsgType=cacheInfo[0];
+
+                            String cacheMsgState=cacheInfo[2];
+                            String cacheMsgSender=cacheInfo[3];
+                            String cacheMsgReceiver=cacheInfo[4];
+                            String cacheMsgDate=cacheInfo[5];
 
                             long cacheMsgId = 0;
                             long currentMsgId = 0;
@@ -337,6 +344,50 @@ public class ProcessMessageFromKafka implements Serializable {
                             } catch (Exception e) {
 
                             }
+
+
+
+                            // 检验
+                            // 门诊
+                            // 申请 CIS EAI OML^O21 NW、RU
+                            // 收费 HIS EAI ORL^O22 OK
+                            // 退费 HIS EAI ORL^O22 CR
+                            // LIS登记 LIS HIS ORL^O22 OR
+                            // LIS取消 LIS HIS ORL^O22 OC
+                            // 住院
+                            // 申请 CIS EAI OML^O21 NW、RU
+                            // 收费 NIS EAI ORL^O22 OK
+                            // LIS登记 LIS HIS ORL^O22 OR
+                            // LIS取消 LIS HIS ORL^O22 OC
+
+
+
+                            // 检查
+                            // 门诊
+                            // 申请 CIS EAI OMG^O19 NW、RU
+                            // 收费 HIS EAI ORG^O20 OK
+                            // 取消 HIS EAI ORG^O20 CR
+                            // 登记 LWUS HIS ORG^O20 OR
+                            // 取消登记 LWUS HIS ORG^O20 MA
+                            // 住院
+                            // 申请 CIS EAI OMG^O19 NW、RU
+                            // 取消 CIS EAI OMG^O19 CA
+                            // 收费 NIS EAI ORG^O20 OK
+                            // 取消 NIS EAI ORG^O20 CR
+                            // 登记 LWUS HIS ORG^O20 OR
+                            // 取消登记 LWUS HIS ORG^O20 MA
+
+
+
+                            //1、CIS发送到EAI
+                            //1.1 没有 NW
+                            //1.2 NW 、RU 顺序错误
+                            //1.3 没有 收费
+                            //1.4 申请收费顺序错误
+                            //2、终端发送到CIS、HIS
+                            //2.1 没有登记
+                            //2.2 取消登记
+
                             switch (info.getMessageType()) {
                                 case "OML_O21":
                                 case "OMG_O19":
@@ -345,15 +396,15 @@ public class ProcessMessageFromKafka implements Serializable {
                                     //状态顺序不一致
 
                                     //OML_O21:273049144:NW:CIS:EAI:2021-03-30
-                                    if ((!cacheInfo[0].equals(info.getMessageType())
-                                            || ("RU".equals(cacheInfo[2]) && "NW".equals(info.getState())))
+                                    if ((!cacheMsgType.equals(info.getMessageType())
+                                            || ("RU".equals(cacheMsgState) && "NW".equals(info.getState())))
                                             && cacheMsgId < currentMsgId
-                                            && cacheInfo[4] != info.getMsgreceiver()
+                                            && cacheMsgReceiver != info.getMsgreceiver()
                                     ) {
                                         log.debug("消息顺序错误,创建时间：{},申请单号：{},当前信息：{},{},{},历史信息：{},{},{}",
                                                 DateFormatUtils.format(info.getDateCreated(), "yyyy-MM-dd HH:mm:ss"),
                                                 info.getApplyNo(), info.getMessageType(), info.getMessageId(), info.getState(),
-                                                cacheInfo[0], cacheInfo[1], cacheInfo[2]
+                                                cacheMsgType, cacheMsgId, cacheMsgState
                                         );
                                         resultSb = buildResult(resultSb, info.getMessageType() + "消息顺序错误", info, cacheInfo);
 
@@ -364,23 +415,23 @@ public class ProcessMessageFromKafka implements Serializable {
                                 case "ORL_O22":
                                 case "ORG_O20":
 
-                                    if (cacheInfo[0].equals(info.getMessageType()) && cacheInfo[4].equals(info.getMsgreceiver())) {
+                                    if (cacheMsgType.equals(info.getMessageType()) && cacheInfo[4].equals(info.getMsgreceiver())) {
                                         log.debug("没有申请消息,创建时间：{},申请单号：{},当前信息：{},{},{},历史信息：{},{},{}",
                                                 DateFormatUtils.format(info.getDateCreated(), "yyyy-MM-dd HH:mm:ss"),
                                                 info.getApplyNo(), info.getMessageType(), info.getMessageId(), info.getState(),
-                                                cacheInfo[0], cacheInfo[1], cacheInfo[2]
+                                                cacheMsgType, cacheMsgId, cacheMsgState
                                         );
                                         resultSb = buildResult(resultSb, info.getMessageType() + "没有申请消息", info, cacheInfo);
 
                                         Tuple2<String, String> saveDate = new Tuple2<>(info.getMessageType() + "没有申请消息:" + new Timestamp(window.getEnd()) + ":" + info.getUpid(), resultSb.toString());
                                         out.collect(saveDate);
-                                    } else if ((("OML_O21".equals(cacheInfo[0]) && !"NW".equals(cacheInfo[2]))
-                                            || ("OMG_O19".equals(cacheInfo[0]) && !"NW".equals(cacheInfo[2])))
+                                    } else if ((("OML_O21".equals(cacheMsgType) && !"NW".equals(cacheMsgState))
+                                            || ("OMG_O19".equals(cacheMsgType) && !"NW".equals(cacheMsgState)))
                                             && (cacheInfo[4].equals(info.getMsgreceiver()))) {
                                         log.debug("没有NW申请消息,创建时间：{},申请单号：{},当前信息：{},{},{},历史信息：{},{},{}",
                                                 DateFormatUtils.format(info.getDateCreated(), "yyyy-MM-dd HH:mm:ss"),
                                                 info.getApplyNo(), info.getMessageType(), info.getMessageId(), info.getState(),
-                                                cacheInfo[0], cacheInfo[1], cacheInfo[2]
+                                                cacheMsgType, cacheMsgId, cacheMsgState
                                         );
                                         resultSb = buildResult(resultSb, info.getMessageType() + "没有NW申请消息", info, cacheInfo);
 
