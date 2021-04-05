@@ -365,6 +365,7 @@ public class ProcessMessageFromKafka implements Serializable {
                             // 检查
                             // 门诊
                             // 申请 CIS EAI OMG^O19 NW、RU
+                            // 取消
                             // 收费 HIS EAI ORG^O20 OK
                             // 取消 HIS EAI ORG^O20 CR
                             // 登记 LWUS HIS ORG^O20 OR
@@ -392,11 +393,12 @@ public class ProcessMessageFromKafka implements Serializable {
                                 case "OML_O21":
                                 case "OMG_O19":
 
-                                    //类型顺序不一致
+                                    //类型顺序不一致 现有收费，后有申请
                                     //状态顺序不一致
 
                                     //OML_O21:273049144:NW:CIS:EAI:2021-03-30
-                                    if ((!cacheMsgType.equals(info.getMessageType())
+                                    if ((
+                                            !cacheMsgType.equals(info.getMessageType())
                                             || ("RU".equals(cacheMsgState) && "NW".equals(info.getState())))
                                             && cacheMsgId < currentMsgId
                                             && cacheMsgReceiver != info.getMsgreceiver()
@@ -415,7 +417,10 @@ public class ProcessMessageFromKafka implements Serializable {
                                 case "ORL_O22":
                                 case "ORG_O20":
 
-                                    if (cacheMsgType.equals(info.getMessageType()) && cacheInfo[4].equals(info.getMsgreceiver())) {
+                                    if (
+                                            cacheMsgType.equals(info.getMessageType())
+                                                    && cacheMsgReceiver.equals(info.getMsgreceiver())
+                                    ) {
                                         log.debug("没有申请消息,创建时间：{},申请单号：{},当前信息：{},{},{},历史信息：{},{},{}",
                                                 DateFormatUtils.format(info.getDateCreated(), "yyyy-MM-dd HH:mm:ss"),
                                                 info.getApplyNo(), info.getMessageType(), info.getMessageId(), info.getState(),
@@ -427,7 +432,7 @@ public class ProcessMessageFromKafka implements Serializable {
                                         out.collect(saveDate);
                                     } else if ((("OML_O21".equals(cacheMsgType) && !"NW".equals(cacheMsgState))
                                             || ("OMG_O19".equals(cacheMsgType) && !"NW".equals(cacheMsgState)))
-                                            && (cacheInfo[4].equals(info.getMsgreceiver()))) {
+                                            && (cacheMsgReceiver.equals(info.getMsgreceiver()))) {
                                         log.debug("没有NW申请消息,创建时间：{},申请单号：{},当前信息：{},{},{},历史信息：{},{},{}",
                                                 DateFormatUtils.format(info.getDateCreated(), "yyyy-MM-dd HH:mm:ss"),
                                                 info.getApplyNo(), info.getMessageType(), info.getMessageId(), info.getState(),
