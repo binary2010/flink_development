@@ -7,6 +7,7 @@ import com.kjl.flink.development.util.GsonUtil;
 import com.kjl.flink.development.util.JedisUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.time.DateFormatUtils;
+import org.apache.commons.lang3.time.StopWatch;
 import org.apache.flink.api.common.JobExecutionResult;
 import org.apache.flink.api.common.eventtime.SerializableTimestampAssigner;
 import org.apache.flink.api.common.eventtime.WatermarkStrategy;
@@ -65,7 +66,7 @@ public class ProcessMessageFromKafka implements Serializable {
     @SuppressWarnings("unchecked")
     public static void main(String[] args) throws Exception {
         host="10.2.200.5";
-        port=16379;
+        port=6379;
         password="20211223fdfsdfsdfdf@$%ssfpoooiSEEWWEE";
 
         JedisPool resultPool = new JedisPool(new JedisPoolConfig(),
@@ -76,7 +77,7 @@ public class ProcessMessageFromKafka implements Serializable {
         StreamExecutionEnvironment env = StreamExecutionEnvironment.getExecutionEnvironment();
         env.setStreamTimeCharacteristic(TimeCharacteristic.EventTime);
 
-        env.setParallelism(4);
+        env.setParallelism(1);
         PojoTypeInfo<MessageBaseInfo> pojoType = (PojoTypeInfo<MessageBaseInfo>) TypeExtractor.createTypeInfo(MessageBaseInfo.class);
 
         resultJedis.setJedisPool(resultPool);
@@ -162,7 +163,7 @@ public class ProcessMessageFromKafka implements Serializable {
                         }
                     }
                 })
-                .setParallelism(4)
+                .setParallelism(1)
                 .assignTimestampsAndWatermarks(WatermarkStrategy
                         .<MessageProcessInfo>forBoundedOutOfOrderness(Duration.ofSeconds(60))
                         .withTimestampAssigner(new SerializableTimestampAssigner<MessageProcessInfo>() {
@@ -173,7 +174,7 @@ public class ProcessMessageFromKafka implements Serializable {
                         })
                         .withIdleness(Duration.ofSeconds(30))
 
-                ).setParallelism(4)
+                ).setParallelism(1)
                 .keyBy(MessageProcessInfo::getApplyNo)
 //                .process(new KeyedProcessFunction<String, MessageProcessInfo, Tuple2<String, String>>() {
 //                    private transient ValueState<Boolean> flagState;
@@ -311,9 +312,14 @@ public class ProcessMessageFromKafka implements Serializable {
                     public void apply(TimeWindow window, Iterable<MessageProcessInfo> input, Collector<Tuple2<String, String>> out) throws Exception {
                         // 计算窗口内数据
                         log.info("当前窗口:{}",new Timestamp(window.getEnd()));
+                        StopWatch sw=new StopWatch();
+                        sw.start();
+
+                        int i=0;
                         StringBuilder resultSb = new StringBuilder();
                         resultSb.delete(0, resultSb.length());
                         for (MessageProcessInfo info : input) {
+                            i++;
                             resultSb.delete(0, resultSb.length());
 
                             Set<String> cache = resultJedis.zrange(
@@ -448,6 +454,8 @@ public class ProcessMessageFromKafka implements Serializable {
                                     break;
                             }
                         }
+                        sw.stop();
+                        log.info("当前窗口:{} 计算结束:{},耗时:{}",new Timestamp(window.getEnd()),i,sw.getTime());
                     }
                 }).setParallelism(1)
                 .addSink(redisSink).name("redis_sink");
